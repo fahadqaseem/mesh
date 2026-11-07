@@ -346,6 +346,31 @@ def section_a(lines: list[str], figs: dict) -> None:
             lines += [f"![Decomposition]({figs['ladder']})", ""]
 
 
+def section_correlations(lines: list[str]) -> None:
+    """Spearman rank correlation, across the real VGGT clouds of sets A and B, between each statistic and mesh quality."""
+    from scipy.stats import spearmanr
+
+    runs = [pipe(s, "_tex_8v") for s in SET_A + SET_B]
+    runs = [r for r in runs if r["stats"] and r["mesh"]]
+    if len(runs) < 10:
+        return
+    lines += ["## A4. Across the real clouds (sets A and B)", "",
+              f"Spearman rank correlation over the {len(runs)} real VGGT clouds (one per shape, filtered points, seed 42). "
+              "A statistic that explains mesh quality correlates positively with Chamfer and negatively with F1.", "",
+              "| statistic | range over the clouds | ρ with Chamfer | ρ with F1@0.02 | ρ with #V |", "|---|---:|---:|---:|---:|"]
+    stats = [("noise σ (% of L)", "noise_sigma", 1.0), ("bias (% of L)", "bias", 1.0),
+             ("outliers (%)", "outlier_frac", 1.0), ("missing surface (100 − coverage, %)", "coverage", -1.0)]
+    for label, key, sign in stats:
+        x = np.array([value(r, "stats", key) for r in runs]) * sign + (100.0 if sign < 0 else 0.0)
+        cols = []
+        for mkey in ("CD", "F1@0.02", "V"):
+            y = np.array([value(r, "mesh", mkey) for r in runs])
+            rho, pval = spearmanr(x, y)
+            cols.append(f"{rho:+.2f} (p={pval:.2g})")
+        lines.append(line([label, f"{x.min():.2f} to {x.max():.2f}"] + cols))
+    lines.append("")
+
+
 def paired(shapes: list[str], a: str, b: str, key: str) -> str:
     d = []
     for s in shapes:
@@ -451,6 +476,7 @@ def main() -> None:
              "Clouds reach the GT frame only through the render cameras. Set A = 7 original shapes, set B = 12 new "
              "shapes (clean test set); pencilpot is the dev shape and is in no mean.", ""]
     section_a(lines, figs)
+    section_correlations(lines)
     section_b(lines, figs)
     section_dev_and_shapes(lines)
     text = "\n".join(lines) + "\n" + (manual or f"{MANUAL}\n## Interpretation\n\n(written when the queue has finished)\n")
