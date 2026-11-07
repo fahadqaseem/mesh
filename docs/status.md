@@ -22,12 +22,13 @@ Snapshot, rewritten at the end of every work block. Last updated: 2026-11-07.
 | GT surface samples (upper bound) | 0.0004 | 0.955 | 0.488 | 1.02 |
 - Main finding: floaters in the VGGT cloud (flying pixels at depth edges) cause MeshFlow's spikes and the ~14% shrink.
   The input stage is the bottleneck, not MeshFlow.
-- VGGT points only, pencilpot grey: chamfer 0.00524, NC 0.847, F1 0.599. Textured: pending (points table).
+- VGGT points vs GT, all 8 scenes: F1 0.53-0.75 (ceiling 0.93-1.00), NC 0.75-0.85, normals outward 83-93%.
+  Grey vs textured (pencilpot): textured is not better (F1 0.569 vs 0.600 grey, chamfer 0.0077 vs 0.0052). Weak evidence: one shape.
 - MeshFlow timing per mesh: MPS 93 s (DiT 1.81 s/step, extraction 33 s); CPU 100 s (DiT 3.24 s/step, extraction 1.6 s).
 
 ## Next 3 steps
 1. Depth-edge filter in the VGGT stage (drop flying pixels), then rerun VGGT (view count per your answer) and MeshFlow.
-2. Points table for all 8 scenes (grey vs textured evidence); MeshFlow on all 8 scenes; first results table for Friday.
+2. MeshFlow on all 8 scenes and the first results table for Friday (points table is done: outputs/points_table.md).
 3. Seed variance for MeshFlow (the mesh changes a lot between runs), so differences in the table can be judged.
 
 ## Open questions
@@ -38,4 +39,6 @@ Snapshot, rewritten at the end of every work block. Last updated: 2026-11-07.
   punishes lightweight meshes: MeshFlow on clean input gets chamfer 4e-4 but F1 0.49 (flat facets). What normalisation,
   sample count and tau does HD-PEA use? Worth asking Hongbo, so our numbers line up with the lab's.
 - **Scale in scoring.** Meshes are scored after rigid ICP (no scale), so size errors count against them. Keep it that way?
+- **Texture.** The procedural texture did not help VGGT on pencilpot. Try grey on one more shape (needs a VGGT run,
+  so it waits for the view-count answer), or keep textured as the default since it is needed for the colour loop anyway?
 - (Answered 2026-11-06: procedural texture now, Google Scanned Objects in December; Y-up + 2 rings x 8 views.)

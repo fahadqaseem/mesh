@@ -4,7 +4,7 @@ One entry per run. Newest on top. Claude: append here after every run, and keep 
 
 ## Next up
 1. [ ] Depth-edge (flying pixel) filter in run_points.py, then VGGT rerun. Waiting on Fahad: 8 views on the Mac, or 16 on the lab GPU?
-2. [ ] Points table for all 8 scenes (`scripts/points_table.py --suffix tex_v1` + pencilpot grey): grey vs textured evidence.
+2. [x] Points table for all 8 scenes (11-07). Grey vs textured: textured not better on pencilpot; check one more shape grey.
 3. [ ] MeshFlow on all 8 scenes (after the floater fix), then the first results table with the F1 ceiling. For Friday's meeting.
 4. [ ] Seed variance: MeshFlow with 3 to 5 seeds on one input, so differences between runs can be judged.
 5. [ ] Adapter: DiT on MPS, decode/extract on CPU (~30 s saved per mesh). Also the guidance 2.5 vs 1.0 check (own process).
@@ -27,6 +27,36 @@ Next:
 ```
 
 ## Runs
+
+### 2026-11-07  points_table_v1  (VGGT points vs GT, all scenes; grey vs textured)
+Goal: stage-1 numbers for every scene, and Fahad's grey vs textured evidence on pencilpot.
+Command: `python scripts/points_table.py --runs pencilpot_299291_grey_v1 --suffix tex_v1` (aligns each run, then scores)
+Input: VGGT v1 runs (16 views), capped at 200k points. Config: default.yaml; camera Umeyama + sim3 ICP; n=100k, tau=0.01.
+Result:
+Points stage vs GT (n=100000, tau=0.01, GT in unit sphere)
+
+| run | #points | chamfer | normal_cons | normal_outward | precision | recall | f1 | f1_ceiling | camera_rms |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| pencilpot_299291_grey_v1 | 200,000 | 5.21e-03 | 0.846 | 0.894 | 0.667 | 0.544 | 0.600 | 0.928 | 0.019 |
+| cryptex_105686_tex_v1 | 200,000 | 1.93e-03 | 0.747 | 0.831 | 0.539 | 0.579 | 0.558 | 0.966 | 0.019 |
+| cylinder_472094_tex_v1 | 200,000 | 1.16e-02 | 0.803 | 0.837 | 0.510 | 0.724 | 0.599 | 1.000 | 0.025 |
+| monsterring_1356640_tex_v1 | 200,000 | 2.34e-02 | 0.785 | 0.934 | 0.785 | 0.633 | 0.701 | 0.958 | 0.014 |
+| nsphere_186199_tex_v1 | 200,000 | 1.27e-02 | 0.757 | 0.851 | 0.545 | 0.507 | 0.525 | 0.993 | 0.033 |
+| pencilpot_299291_tex_v1 | 200,000 | 7.68e-03 | 0.837 | 0.879 | 0.617 | 0.528 | 0.569 | 0.928 | 0.015 |
+| presents_98021_tex_v1 | 200,000 | 6.24e-03 | 0.800 | 0.862 | 0.704 | 0.647 | 0.674 | 0.956 | 0.016 |
+| shackbot_94155_tex_v1 | 200,000 | 2.08e-02 | 0.768 | 0.878 | 0.555 | 0.534 | 0.544 | 0.974 | 0.027 |
+| wheel_76903_tex_v1 | 200,000 | 1.00e-02 | 0.791 | 0.931 | 0.875 | 0.651 | 0.747 | 0.958 | 0.011 |
+
+Notes / what I saw:
+  - Grey vs textured (pencilpot): textured is NOT better. chamfer 0.0077 vs 0.0052 grey, F1 0.569 vs 0.600, NC 0.837 vs 0.846.
+    One shape and one run each, so this is weak evidence. Possible reasons: shading already gives VGGT enough features on
+    this shape, or the smooth sine pattern adds little. Worth a second shape before drawing a conclusion.
+  - F1 is 0.53-0.75 against a ceiling of 0.93-1.00. Recall (0.51-0.72) is limited by unseen surfaces; precision by floaters.
+  - Chamfer varies 12x across shapes (0.002-0.023) and is dominated by floaters (squared distances); not a fair shape-to-shape
+    comparison until the floater fix.
+  - Normals point outward 83-93% of the time; wrong ones are mostly noisy points (see vggt_v1 entry).
+Takeaway: stage 1 works on every shape, but floaters dominate the error; the depth-edge filter is the next lever.
+Next: floater fix (waiting on the view-count answer), then rerun this table.
 
 ### 2026-11-07  pencilpot_299291_tex_v1 / ablation  (what limits MeshFlow: input or mesher?)
 Goal: find the cause of the spikes, split and shrink in the first MeshFlow mesh.
