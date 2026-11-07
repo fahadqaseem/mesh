@@ -1,37 +1,57 @@
 # Status
 
-Snapshot, rewritten at the end of every work block. Last updated: 2026-11-07.
+Snapshot, rewritten at the end of every work block. Last updated: 2026-11-07 01:30.
+
+## Running now: overnight queue (started 01:27, expected finish ~03:15, at the latest ~04:00 with memory waits)
+- `nohup caffeinate -is scripts/overnight.sh` (log `outputs/overnight/runner.log`); queue `outputs/overnight/queue.tsv`
+  (215 jobs, built by `scripts/make_overnight_queue.py`). One job at a time, each in its own process; before every job:
+  free memory >= 30% and free disk >= 15 GB, else wait 5 min, skip after 3 checks; 30 min cap per job; failures are
+  logged and skipped. Progress: `outputs/overnight/progress.txt`; per-job logs in `outputs/overnight/jobs/`.
+- After each step the results doc `docs/results/2026-11-07_overnight.md` is regenerated, committed and pushed.
+- Steps (most important first):
+  1. 8 shapes: VGGT (8 views, default v2) -> align (cameras only) -> points eval -> MeshFlow seed 42 + eval.
+     Also the uncalibrated variant (VGGT's own focal) from the same VGGT pass. (~21 min)
+  2. Upper bound: MeshFlow on clean GT surface samples, 8 shapes. (~9 min)
+  3. Seed variance: MeshFlow seeds 7 and 123 on every step-1 cloud. (~17 min)
+  4. Grey vs textured: shackbot, presents, wheel (+ pencilpot), 3 seeds each. (~15 min)
+  5. 12 more Thingi10K shapes (`configs/step5_shapes.txt`): render, steps 1 and 2. (~36 min)
+- If it stopped: rerun the same command; finished jobs are skipped.
 
 ## What works
-- End to end on the Mac: render (Thingi10K, v1 cameras + procedural texture) -> VGGT points -> alignment to GT -> CVPR MeshFlow mesh -> scores.
-- CVPR MeshFlow with the real checkpoint on MPS and CPU (~95 s per mesh either way; MPS 5.5 GB, CPU 10 GB peak).
-- VGGT points for all 8 test scenes (16 views, capped to 200k points each). Camera alignment to GT ~0.017 RMS (rig radius 3).
-- Evaluation of points and meshes (Chamfer, NC, F1, F1 ceiling, normal_outward). 14 tests pass.
-- Memory rules applied: one heavy job at a time, 200k point cap, raw.npz opt-in (outputs/ 1.7 GB -> 53 MB).
+- Full pipeline on the Mac under the memory rules: render -> VGGT (8 views) -> camera alignment -> MeshFlow -> protocol-v1 scores.
+- Evaluation protocol v1 written down (`docs/eval_protocol.md`: MeshFlow paper's CD/HD, plus NC, F1@0.01/0.02, #V/#F, G).
+- MeshFlow hybrid (DiT on MPS, extraction on CPU): ~51 s per mesh, identical output to all-MPS.
+- 20 tests pass.
 
 ## Blocked
-- **Floater fix needs a VGGT rerun**, and the memory rules cap VGGT on the Mac at 8 views, while the scenes have 16.
-  Waiting on Fahad (see Open questions). Until then, no new VGGT runs.
-- 16-view VGGT, and anything that keeps VGGT and MeshFlow in memory together, waits for the lab GPU (Mac crash on 2026-11-07).
+- 16-view VGGT (and the 8 vs 16 comparison) waits for the lab GPU (Mac memory: 16 views ~19 GB).
 
-## Current numbers (pencilpot, MeshFlow on MPS; old protocol: rigid ICP, n=100k, tau=0.01; to be rescored)
-| MeshFlow input | Chamfer | NC | F1 | size vs GT |
-|---|---|---|---|---|
-| VGGT points as is | 0.0334 | 0.731 | 0.088 | 0.86 |
-| DIAGNOSTIC ONLY, not a result: VGGT with floaters removed using the GT | 0.0115 | 0.884 | 0.369 | 0.98 |
-| GT surface samples (upper bound) | 0.0004 | 0.955 | 0.488 | 1.02 |
-- Main finding: floaters in the VGGT cloud (flying pixels at depth edges) cause MeshFlow's spikes and the ~14% shrink.
-  The input stage is the bottleneck, not MeshFlow.
-- VGGT points vs GT, all 8 scenes: F1 0.53-0.75 (ceiling 0.93-1.00), NC 0.75-0.85, normals outward 83-93%.
-  Grey vs textured (pencilpot): textured is not better (F1 0.569 vs 0.600 grey, chamfer 0.0077 vs 0.0052). Weak evidence: one shape.
-- MeshFlow timing per mesh: MPS 93 s (DiT 1.81 s/step, extraction 33 s); CPU 100 s (DiT 3.24 s/step, extraction 1.6 s).
+## Current numbers (pencilpot, protocol v1, MeshFlow mean of seeds 42/7/123)
+| input | CD | HD | NC | F1@0.01 | F1@0.02 | size |
+|---|---|---|---|---|---|---|
+| old: 16 views, VGGT focal, no filter | 10.64 | 37.3 | 0.791 | 0.147 | 0.318 | 1.35 |
+| new default: 8 views, known focal, multi-view >= 2, erode 2 | 10.02 | 31.0 | 0.786 | 0.148 | 0.339 | 1.06 |
+- CD floor (perfect mesh) for pencilpot: 2.79. Overnight step 2 gives the MeshFlow upper bound on clean input.
+- Main findings today: (1) VGGT's focal is 3-8% short on textured renders, which distorts the cloud; (2) floaters are
+  mostly multi-view-inconsistent depth, not silhouette flying pixels; a multi-view check removes the halo.
+- DIAGNOSTIC ONLY (never a result): the earlier "floaters removed using GT" input; it showed the input stage is the bottleneck.
 
-## Next 3 steps
-1. Depth-edge filter in the VGGT stage (drop flying pixels), then rerun VGGT (view count per your answer) and MeshFlow.
-2. MeshFlow on all 8 scenes and the first results table for Friday (points table is done: outputs/points_table.md).
-3. Seed variance for MeshFlow (the mesh changes a lot between runs), so differences in the table can be judged.
+## Next 3 steps (after the overnight run)
+1. Read the overnight report; write the summary for Friday (results table with mean and spread, upper bound, seed spread).
+2. Depth quality: the pipeline is far from the clean-input upper bound. Try VGGT's point head vs depth unprojection,
+   and a per-view depth scale check against the multi-view consensus.
+3. Lab GPU: 16-view VGGT for the 8 vs 16 comparison.
 
-## Open questions
-- None open. Answered 2026-11-07 (see decisions.md): 8-view VGGT on the Mac now, 16 on the lab GPU later; no HD-PEA
-  dependency; scoring protocol in docs/eval_protocol.md; scale errors stay in the score (camera alignment only, no ICP);
-  texture stays the default; the GT-cleaned input is diagnostic only; MPS sampling + CPU extraction if the hybrid checks out.
+## Open questions (decisions I made overnight; all reversible)
+- **Known focal as the headline.** VGGT's predicted focal is 3-8% short on textured renders; with camera-only alignment
+  this costs a lot (pencilpot mesh F1@0.02 0.30 -> 0.16). I use the render focal (as EXIF would give for real photos)
+  for the headline and report VGGT's own focal as the "uncalibrated" variant next to it. OK, or should the headline be
+  uncalibrated?
+- **Edge-pixel fix.** The plain depth-discontinuity filter did not help (most floaters are not silhouette pixels). The
+  default now uses a 2 px silhouette erosion plus a multi-view depth-consistency check (>= 2 other views agree within
+  1%). Thresholds were picked on pencilpot only (with the GT used for diagnosis) and kept fixed for all other shapes.
+- **One frame for all metrics.** MeshFlow's [-0.5, 0.5] unit cube is used for CD/HD and also for the F1 thresholds
+  (rather than a unit sphere for F1), so all numbers share one frame.
+- **8 views = 0,2,4,6 (20 deg ring) + 9,11,13,15 (50 deg ring).** Every other camera per ring.
+- **Step 5 shapes** were picked automatically: clean, watertight, 1k-20k faces, thinnest/longest extent >= 0.35.
+- **Grey vs textured** uses shackbot, presents, wheel, plus pencilpot again (redone with the new pipeline).
