@@ -51,7 +51,9 @@ def main() -> None:
     view_ids = list(range(len(images))) if ids in ("all", None) else \
         [int(i) for i in (ids.split(",") if isinstance(ids, str) else ids)]
     raw_path = raw_dir / "raw.npz"
-    if args.reuse_raw and raw_path.exists():
+    if args.reuse_raw:
+        if not raw_path.exists():
+            raise SystemExit(f"--reuse-raw: {raw_path} not found (refusing to rerun VGGT silently)")
         pred = dict(np.load(raw_path))
         view_ids = [int(i) for i in pred.pop("view_ids", view_ids)]
     else:
@@ -61,6 +63,7 @@ def main() -> None:
             raw_dir.mkdir(parents=True, exist_ok=True)
             np.savez(raw_path, **pred)   # unfiltered VGGT output, so filtering can be rerun alone
         pred.pop("view_ids")
+    intrinsic_pred = pred["intrinsic"].copy()          # VGGT's own estimate, kept for diagnostics
     if cfg.get("intrinsics", "predicted") == "known":
         # calibrated setting: the render focal is known (as EXIF would give for real photos); re-unproject VGGT depth
         from vggt.utils.geometry import unproject_depth_map_to_point_map
@@ -72,7 +75,7 @@ def main() -> None:
         pred["intrinsic"] = k
         pred["points"] = unproject_depth_map_to_point_map(pred["depth"][..., None], pred["extrinsic"], k).astype(np.float32)
     np.savez(out_dir / "cameras.npz", extrinsic=pred["extrinsic"], intrinsic=pred["intrinsic"],
-             cam_centres=pred["cam_centres"], view_ids=np.array(view_ids))
+             cam_centres=pred["cam_centres"], view_ids=np.array(view_ids), intrinsic_pred=intrinsic_pred)
     flat = flatten_views(pred)
     pts, conf, cols, views = flat["points"], flat["conf"], flat["colors"], flat["viewpoints"]
 
