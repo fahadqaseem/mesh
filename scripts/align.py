@@ -27,7 +27,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--run", required=True)
     ap.add_argument("--scene", required=True)
-    ap.add_argument("--icp", choices=["none", "rigid", "sim3"], default="sim3")
+    ap.add_argument("--icp", choices=["none", "rigid", "sim3"], default="none",
+                    help="protocol v1 uses none (camera alignment only); ICP only for diagnostics")
     ap.add_argument("--icp-points", type=int, default=50_000, help="subsample for ICP speed")
     args = ap.parse_args()
 

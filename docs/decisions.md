@@ -26,3 +26,5 @@ Things agreed with Prof. Zhong, with the date. Add new ones at the bottom.
 | 2026-11-07 | Texture stays the default. Grey vs textured on 2 to 3 more shapes when convenient | Fahad; one-shape evidence is weak, and texture is needed for the colour loop |
 | 2026-11-07 | The "floaters removed using GT" input is diagnostic only: labelled that way everywhere, never used as a result | Fahad; it uses the GT |
 | 2026-11-07 | Default MeshFlow device split: MPS for flow sampling, CPU for mesh extraction, if the ~62 s hybrid checks out | Fahad; extraction is 20x slower on MPS |
+| 2026-11-07 | (Reconfirmed by Fahad with the overnight plan: decisions 1-7 above, same content) | Overnight autonomous run |
+| 2026-11-07 | Protocol v1 uses the MeshFlow unit-cube frame ([-0.5,0.5], GT bbox) for all metrics, incl. F1 thresholds; CD/HD at 5k samples (MeshFlow), NC/F1 at 100k | MeshFlow states its frame; one frame keeps metrics consistent. My choice (safest), noted in status.md |
