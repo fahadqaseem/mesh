@@ -3,39 +3,39 @@
 Snapshot, rewritten at the end of every work block. Last updated: 2026-11-07.
 
 ## What works
-- End to end on the Mac: render (Thingi10K, v1 cameras + procedural texture) -> VGGT points -> alignment to GT -> CVPR MeshFlow mesh.
-  First real MeshFlow mesh exists (pencilpot, MPS). It is recognisable but has artefacts (see numbers).
-- VGGT points for all 8 test scenes (16 views each, plus grey pencilpot).
-- Alignment: camera-centre Umeyama + trimmed ICP. VGGT cameras match the GT rig to ~0.017 RMS (rig radius 3).
-- Point-cloud and mesh evaluation (Chamfer, NC, F1, plus normal_outward and the F1 ceiling). 14 tests pass.
-- MeshFlow weights downloaded (ckpt/meshflow/meshflow/).
+- End to end on the Mac: render (Thingi10K, v1 cameras + procedural texture) -> VGGT points -> alignment to GT -> CVPR MeshFlow mesh -> scores.
+- CVPR MeshFlow with the real checkpoint on MPS and CPU (~95 s per mesh either way; MPS 5.5 GB, CPU 10 GB peak).
+- VGGT points for all 8 test scenes (16 views, capped to 200k points each). Camera alignment to GT ~0.017 RMS (rig radius 3).
+- Evaluation of points and meshes (Chamfer, NC, F1, F1 ceiling, normal_outward). 14 tests pass.
+- Memory rules applied: one heavy job at a time, 200k point cap, raw.npz opt-in (outputs/ 1.7 GB -> 53 MB).
 
 ## Blocked
-- **Heavy work on the Mac is memory-limited.** The Mac crashed on 2026-11-07 (~00:15): 16-view VGGT (~19 GB) followed by
-  MeshFlow (4.5 GB weights) exhausted memory and swap. New Mac memory rules in CLAUDE.md. 16-view VGGT runs and anything
-  that loads VGGT and MeshFlow together have to wait for the lab GPU.
-- CPU vs MPS MeshFlow timing was lost in the crash. Rerunning it one device at a time.
+- **Floater fix needs a VGGT rerun**, and the memory rules cap VGGT on the Mac at 8 views, while the scenes have 16.
+  Waiting on Fahad (see Open questions). Until then, no new VGGT runs.
+- 16-view VGGT, and anything that keeps VGGT and MeshFlow in memory together, waits for the lab GPU (Mac crash on 2026-11-07).
 
-## Current numbers
-- VGGT pencilpot grey vs GT: chamfer 0.00524, NC 0.847, F1 0.599 (precision 0.668, recall 0.544), normals outward 89%.
-  Textured scores: pending (points table).
-- VGGT on the Mac: 45-65 s per 16-view scene, ~19 GB peak.
-- First MeshFlow mesh (pencilpot textured, MPS): 1752 verts / 9640 faces, not watertight. After rigid ICP:
-  chamfer 0.0308, NC 0.737, F1 0.131. Spike triangles, a split through the mouth, ~13% too small.
-- F1 ceiling (perfect reconstruction, tau 0.01, 100k samples): 0.93-1.00 depending on the shape.
+## Current numbers (pencilpot, MeshFlow on MPS, rigid ICP, n=100k, tau=0.01)
+| MeshFlow input | Chamfer | NC | F1 | size vs GT |
+|---|---|---|---|---|
+| VGGT points as is | 0.0334 | 0.731 | 0.088 | 0.86 |
+| VGGT, floaters removed (oracle, uses GT) | 0.0115 | 0.884 | 0.369 | 0.98 |
+| GT surface samples (upper bound) | 0.0004 | 0.955 | 0.488 | 1.02 |
+- Main finding: floaters in the VGGT cloud (flying pixels at depth edges) cause MeshFlow's spikes and the ~14% shrink.
+  The input stage is the bottleneck, not MeshFlow.
+- VGGT points only, pencilpot grey: chamfer 0.00524, NC 0.847, F1 0.599. Textured: pending (points table).
+- MeshFlow timing per mesh: MPS 93 s (DiT 1.81 s/step, extraction 33 s); CPU 100 s (DiT 3.24 s/step, extraction 1.6 s).
 
 ## Next 3 steps
-1. MeshFlow CPU vs MPS timing on pencilpot (one process per device, memory check first).
-2. Oracle-input ablation: MeshFlow on clean GT surface samples. Do the artefacts come from the VGGT input or from MeshFlow?
-3. Points table for all scenes (grey vs textured evidence), then MeshFlow on all 8 scenes.
+1. Depth-edge filter in the VGGT stage (drop flying pixels), then rerun VGGT (view count per your answer) and MeshFlow.
+2. Points table for all 8 scenes (grey vs textured evidence); MeshFlow on all 8 scenes; first results table for Friday.
+3. Seed variance for MeshFlow (the mesh changes a lot between runs), so differences in the table can be judged.
 
 ## Open questions
-- **8 vs 16 views.** You chose 16 views (2 rings x 8), but the new memory rule caps VGGT on the Mac at 8 views.
-  The 8 existing 16-view point clouds are already done, so nothing needs rerunning now. For new VGGT runs on the Mac,
-  should I use 8 views (4 per ring), or wait for the lab GPU for 16? Safest for now: keep the existing 16-view results
-  and run no new VGGT jobs until you decide.
-- **Metric protocol.** At tau = 0.01 on a unit sphere with 100k samples, F1 is capped at 0.93-1.00 even for a perfect mesh.
-  What normalisation, sample count and tau does HD-PEA use? Worth asking Hongbo so our numbers match the lab's.
-- **MeshFlow scale.** Its output is ~13% smaller than the input cloud. Should scoring use rigid ICP (current) or allow
-  scale? With scale, a size error would hide; without it, scores include it. Currently rigid only.
-- (Earlier, answered by Fahad on 2026-11-06: procedural texture now, Google Scanned Objects in December; Y-up + 2 rings.)
+- **8 vs 16 views for the VGGT rerun.** The floater fix needs new VGGT runs. Options: (a) 8 views on the Mac (4 per ring,
+  every other camera), which is allowed by the memory rules but differs from your 16-view setup; (b) wait for the lab GPU
+  and keep 16. Safest for now: no new VGGT runs; I work on things that do not need them.
+- **Metric protocol.** F1 at tau 0.01 (unit sphere, 100k samples) is capped at 0.93-1.00 even for a perfect mesh, and it
+  punishes lightweight meshes: MeshFlow on clean input gets chamfer 4e-4 but F1 0.49 (flat facets). What normalisation,
+  sample count and tau does HD-PEA use? Worth asking Hongbo, so our numbers line up with the lab's.
+- **Scale in scoring.** Meshes are scored after rigid ICP (no scale), so size errors count against them. Keep it that way?
+- (Answered 2026-11-06: procedural texture now, Google Scanned Objects in December; Y-up + 2 rings x 8 views.)

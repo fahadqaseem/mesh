@@ -3,17 +3,17 @@
 One entry per run. Newest on top. Claude: append here after every run, and keep "Next up" current.
 
 ## Next up
-1. [ ] MeshFlow CPU vs MPS timing with the real checkpoint on pencilpot (one process per device, memory check first).
-2. [ ] Oracle-input ablation: MeshFlow on clean GT surface samples vs on VGGT points. Tells whether the spikes and
-       split in pencilpot come from noisy input or from MeshFlow itself.
-3. [ ] Points table for all 8 scenes (`scripts/points_table.py --suffix tex_v1` + pencilpot grey): grey vs textured evidence.
-4. [ ] Memory rules: cap saved points (~200k), delete raw.npz. Future VGGT runs on the Mac use at most 8 views (see status.md).
-5. [ ] MeshFlow on all 8 scenes, then the first results table (Chamfer / NC / F1 / #verts, with F1 ceiling). Bring it to Friday's meeting.
+1. [ ] Depth-edge (flying pixel) filter in run_points.py, then VGGT rerun. Waiting on Fahad: 8 views on the Mac, or 16 on the lab GPU?
+2. [ ] Points table for all 8 scenes (`scripts/points_table.py --suffix tex_v1` + pencilpot grey): grey vs textured evidence.
+3. [ ] MeshFlow on all 8 scenes (after the floater fix), then the first results table with the F1 ceiling. For Friday's meeting.
+4. [ ] Seed variance: MeshFlow with 3 to 5 seeds on one input, so differences between runs can be judged.
+5. [ ] Adapter: DiT on MPS, decode/extract on CPU (~30 s saved per mesh). Also the guidance 2.5 vs 1.0 check (own process).
 6. [ ] Experiment: Gaussian centres vs interpolated points as MeshFlow input.
 7. [ ] December (with the colour render-back loop, priority 2): add Google Scanned Objects for real textures.
 
 Done: env + pytest (11-06); MeshFlow weights downloaded (11-07); 8 Thingi10K shapes rendered v1 (Y-up, 2 rings x 8,
-procedural texture); VGGT on all 8 scenes (16 views); alignment stage (camera Umeyama + ICP); point-cloud evaluation.
+procedural texture); VGGT on all 8 scenes (16 views); alignment stage (camera Umeyama + ICP); point-cloud evaluation;
+MeshFlow CPU vs MPS timing (11-07); input ablation on pencilpot (11-07); point cap 200k + raw.npz opt-in.
 
 ## Template
 ```
@@ -27,6 +27,46 @@ Next:
 ```
 
 ## Runs
+
+### 2026-11-07  pencilpot_299291_tex_v1 / ablation  (what limits MeshFlow: input or mesher?)
+Goal: find the cause of the spikes, split and shrink in the first MeshFlow mesh.
+Command: `python scripts/bench_meshflow.py --points <input>.ply --device mps --out outputs/pencilpot_299291_tex_v1/ablation/<name>`
+Input (all in the GT frame, MeshFlow resamples 4096 points from each):
+  (a) VGGT points as is (200k cap); (b) the same with floaters removed using the GT (points > 0.03 from the GT surface dropped,
+  6.3% of points); diagnostic only, not a real method; (c) 200k clean GT surface samples (upper bound for the mesher).
+Config: real checkpoint, fp32, MPS, 28 steps, seed 42, guidance 1.0. Scored after rigid ICP (no scale), n=100k, tau=0.01.
+Result:
+  (a) VGGT as is:         chamfer=0.0334  nc=0.731  f1=0.088  verts=3770 faces=11763  size vs GT 0.86  spikes
+  (b) floaters removed:   chamfer=0.0115  nc=0.884  f1=0.369  verts=1442 faces=7449   size vs GT 0.98  no spikes; split at mouth, ragged holes
+  (c) GT samples:         chamfer=0.0004  nc=0.955  f1=0.488  verts=361  faces=746    size vs GT 1.02  clean low-poly mesh
+  Picture: outputs/pencilpot_299291_tex_v1/ablation/compare_inputs.png
+Notes / what I saw:
+  - The VGGT cloud has a halo of floaters (max radius 1.47 vs 1.00 for GT; extents 2.2 vs 1.7). MeshFlow fits the whole
+    cloud into its unit sphere, so the real surface shrinks (~0.86), and floaters among the 4096 samples become spikes.
+  - Local density filters do not remove the halo (statistical k=32 std=0.5 still leaves max radius 1.25, and loses 6.5% of
+    the surface). Floaters are dense: most likely flying pixels at depth edges (silhouettes). Fix belongs in the VGGT
+    stage: drop pixels at depth discontinuities or erode the foreground mask. That needs a VGGT rerun.
+  - With clean input, MeshFlow is good (chamfer 4e-4, NC 0.955), but F1@0.01 is only 0.49: flat facets of a lightweight
+    mesh sit > 0.01 from a curved surface. F1 at this tau penalises exactly the lightweight meshes we want (metric question).
+Takeaway: the input stage, not MeshFlow, is the bottleneck now. This is evidence for the stage-wise ablation argument.
+Next: depth-edge filter in run_points.py + VGGT rerun (view count pending Fahad's answer), then MeshFlow on all scenes.
+
+### 2026-11-07  pencilpot_299291_tex_v1 / meshflow CPU vs MPS  (real checkpoint, timing)
+Goal: CPU vs MPS timing of CVPR MeshFlow on the Mac (rerun after the crash, one process per device).
+Command: `python scripts/bench_meshflow.py --points outputs/pencilpot_299291_tex_v1/align/points_aligned.ply --device {mps,cpu} --out outputs/pencilpot_299291_tex_v1/mesh_bench`
+Input: VGGT textured pencilpot, aligned, capped at 200k points (the crash run used the 2M cloud).
+Config: real checkpoint, fp32, 28 steps, seed 42, guidance 1.0.
+Result:
+  | device | load | sampling (28 steps) | per step | decode+extract | total | peak RSS | verts / faces |
+  | MPS    | 9.5 s | 50.7 s | 1.81 s | 32.7 s | ~93 s  | 5.5 GB | 3770 / 11763 |
+  | CPU    | 7.4 s | 90.8 s | 3.24 s | 1.6 s  | ~100 s | 10.1 GB | 3558 / 22208 |
+  Scores after rigid ICP: MPS chamfer=0.0334 f1=0.088; CPU chamfer=0.0284 f1=0.100; crash-run (2M input) chamfer=0.0308 f1=0.131.
+Notes / what I saw: MPS is 1.8x faster for the DiT, but mesh extraction is 20x slower on MPS, so totals are similar.
+  Best option on the Mac: DiT on MPS, decode/extract on CPU (~62 s expected; not implemented yet).
+  CPU and MPS meshes differ for the same seed (different devices draw different noise), and the mesh changes a lot with the
+  4096-point resample of the input (1752 vs 3770 verts). Seed-to-seed variance must be measured before comparing numbers.
+  The guidance 2.5 vs 1.0 check is still not done (it was the pass running during the crash).
+Next: see the ablation entry above.
 
 ### 2026-11-07  pencilpot_299291_tex_v1 / meshflow_mps  (first real MeshFlow mesh)
 Goal: first run of CVPR MeshFlow with the real checkpoint on a VGGT point cloud; CPU vs MPS timing.
