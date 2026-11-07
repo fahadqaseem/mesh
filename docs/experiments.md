@@ -31,6 +31,38 @@ Next:
 
 ## Runs
 
+### 2026-11-07  pencilpot_299291_tex_v2  (Part A: 8 views + floater fixes; protocol v1)
+Goal: 8-view VGGT (Mac memory rule) with an edge-pixel fix, confirmed on pencilpot against the old 16-view run.
+Command: `python scripts/run_points.py --images data/scenes/pencilpot_299291/images_tex --run pencilpot_299291_tex_v2 --keep-raw`,
+  variants with `--reuse-raw --raw-from pencilpot_299291_tex_v2 --set ...`, then `scripts/align.py` (cameras only) and
+  `scripts/mesh_eval.py --seed {42,7,123}` (MeshFlow hybrid: DiT on MPS, extraction on CPU).
+Input: views 0,2,4,6 (20 deg ring) + 9,11,13,15 (50 deg ring), textured. VGGT: 28 s, peak 15.2 GB (16 views: ~19 GB).
+Findings on the way:
+  1. VGGT underestimates the focal length on these renders: 0.924x (8 views textured), 0.938x (16 textured), 1.014x (grey),
+     0.972x (wheel). A short focal spreads unprojected points sideways; this was the ~6% "scale" ICP used to absorb, and
+     with camera-only alignment (protocol v1) it ruins the cloud: 83% of points > 0.03 from GT. With the known render focal
+     (as EXIF would give), 44%. It also explains the earlier grey-vs-textured result (grey had the right focal).
+  2. The depth-discontinuity (edge pixel) filter alone barely helps (floaters 13.6% -> 13.2%, diagnostic ICP view):
+     most floaters are not silhouette flying pixels.
+  3. Multi-view consistency (keep a pixel only if >= 2 other views see the same depth within 1%) removes the halo:
+     cloud max radius 1.45 -> 1.02-1.05 (GT 1.00). Plus 2 px foreground erosion (the silhouette rim).
+  Filter thresholds were chosen on this shape only, using the GT for diagnosis; the same settings are used everywhere.
+Result (MeshFlow, protocol v1, mean of seeds 42/7/123; size = mesh max extent / GT):
+  | input | CD | HD | NC | F1@0.01 | F1@0.02 | #V (range) | size |
+  | old: 16 views, VGGT focal, no filter      | 10.64 | 37.3 | 0.791 | 0.147 | 0.318 | 2691-3815 | 1.35 |
+  | 8 v, VGGT focal, no filter (seed 42 only) | 19.22 | 48.3 | 0.664 | 0.096 | 0.203 | 3905      | 1.34 |
+  | 8 v, known focal                          |  9.49 | 30.4 | 0.797 | 0.170 | 0.336 | 1782-3494 | 1.22 |
+  | 8 v, known focal + mv>=2 + erode 2 (NEW DEFAULT) | 10.02 | 31.0 | 0.786 | 0.148 | 0.339 | 918-2429 | 1.06 |
+  | 8 v, VGGT focal + mv>=2 + erode 2 (seed 42 only) | 12.50 | 32.7 | 0.792 | 0.047 | 0.157 | 2369 | 1.10 |
+  | 8 v, known focal + mv>=1 + erode 2        |  9.91 | 30.2 | 0.833 | 0.129 | 0.294 | 1386-3960 | 1.07 |
+  CD floor (perfect mesh) for pencilpot: 2.79. Seed spread of the old run: CD 8.4-13.3.
+  Hybrid timing: 50.5-51.6 s per mesh (sampling + extraction) vs ~83 s all-MPS and ~92 s all-CPU; CPU extraction from the
+  same latents gives an identical mesh (vertices within 8e-7). Peak RSS 9-11 GB.
+Takeaway: the 8-view default beats the old 16-view run on CD (10.0 vs 10.6), HD (31 vs 37) and size (1.06 vs 1.35), ties
+  on F1 and NC; differences in CD are within seed spread. The big lever is the focal length, then multi-view consistency.
+  All meshes are still far from the GT-input upper bound (CD ~3 on clean input): VGGT depth quality is the bottleneck.
+Next: overnight queue on all 8 shapes with this default (and the VGGT-focal variant for honesty).
+
 ### 2026-11-07  points_table_v1  (VGGT points vs GT, all scenes; grey vs textured)
 Goal: stage-1 numbers for every scene, and Fahad's grey vs textured evidence on pencilpot.
 Command: `python scripts/points_table.py --runs pencilpot_299291_grey_v1 --suffix tex_v1` (aligns each run, then scores)

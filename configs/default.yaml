@@ -1,6 +1,13 @@
 # Default settings. Copy to configs/<experiment>.yaml to change things per experiment.
 
 points:
+  view_ids: [0, 2, 4, 6, 9, 11, 13, 15]   # 8 views, 4 per ring (Mac memory rule); "all" for every image
+  edge_rel: 0.0                  # depth-edge filter: drop pixels whose depth jumps > edge_rel * depth vs a neighbour (0 = off)
+  edge_dilate: 1                 # widen detected edges by this many pixels
+  fg_erode: 2                    # erode the foreground (conf > min_conf) mask by this many pixels
+  mv_rel: 0.01                   # multi-view consistency: depth agreement tolerance (relative); 0 = off
+  mv_min_views: 2                # keep points that at least this many other views agree with
+  intrinsics: known              # predicted (VGGT's own focal) | known (render focal from gt_transform.json)
   use_depth_unprojection: true   # VGGT authors: depth + cameras is more accurate than the point head
   conf_percentile: 50            # drop the least confident half of pixels
   min_conf: 1.0
@@ -18,6 +25,7 @@ mesh:
     seed: 42
     dtype: fp16                  # forced to fp32 off CUDA
     num_verts: null              # rough target vertex count, null = model decides
+    device: null                 # null = auto: hybrid on Apple silicon (DiT on MPS, extraction on CPU), else cuda/cpu
   hdpea: {}
 
 eval:

@@ -36,6 +36,8 @@ def main() -> None:
     pts = load_points_ply(run_dir / "points" / "points.ply")
     cams = np.load(run_dir / "points" / "cameras.npz")
     gt_c2w = np.load(scene / "gt_cam_poses.npy")
+    if "view_ids" in cams:
+        gt_c2w = gt_c2w[cams["view_ids"]]                  # only the views VGGT was given
     assert len(gt_c2w) == len(cams["extrinsic"]), "camera count differs between VGGT and GT"
 
     sim, cam_rms = align_by_cameras(camera_centres_from_extrinsic(cams["extrinsic"]), gt_c2w)

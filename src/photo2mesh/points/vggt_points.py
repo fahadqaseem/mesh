@@ -16,7 +16,7 @@ def run_vggt(image_paths: list[str], use_depth_unprojection: bool = True) -> dic
     """Run VGGT on a list of images of one object/scene.
 
     Returns a dict of numpy arrays:
-        points (S, H, W, 3), conf (S, H, W), colors (S, H, W, 3) in [0, 1],
+        points (S, H, W, 3), conf (S, H, W), colors (S, H, W, 3) in [0, 1], depth (S, H, W),
         extrinsic (S, 3, 4) camera-from-world (OpenCV), intrinsic (S, 3, 3),
         cam_centres (S, 3) in world coordinates.
     """
@@ -50,12 +50,13 @@ def run_vggt(image_paths: list[str], use_depth_unprojection: bool = True) -> dic
         points = pred["world_points"][0].float().cpu().numpy()
         conf = pred["world_points_conf"][0].float().cpu().numpy()
 
+    depth_map = pred["depth"][0].float().cpu().numpy().reshape(points.shape[:3])   # for depth-edge filtering
     rot, trans = extrinsic[:, :, :3], extrinsic[:, :, 3]
     cam_centres = -np.einsum("sji,sj->si", rot, trans)              # C = -R^T t
     colors = images.permute(0, 2, 3, 1).float().cpu().numpy()
     return {"points": np.asarray(points, np.float32), "conf": np.asarray(conf, np.float32),
             "colors": colors, "extrinsic": extrinsic, "intrinsic": intrinsic,
-            "cam_centres": cam_centres.astype(np.float32)}
+            "cam_centres": cam_centres.astype(np.float32), "depth": depth_map.astype(np.float32)}
 
 
 def flatten_views(pred: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
