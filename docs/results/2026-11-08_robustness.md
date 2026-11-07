@@ -173,4 +173,54 @@ Pencilpot tuned the point filters (earlier) and the TSDF settings (this block).
 <!-- manual -->
 ## Interpretation
 
-(written when the queue has finished)
+Queue: 600 of 600 jobs ok (12:23 to 15:02), no memory waits. The VGGT rerun of every shape was byte-identical to
+last night's (checked by `cmp` per shape), so last night's filtered-points meshes are a fair paired baseline.
+
+**1. Which corruption explains the gap: missing surface.**
+- MeshFlow is robust to noise. Up to 1% of the object size Chamfer barely moves (2.74 clean, 3.25 at 1%, 3.84 at 2%).
+  The real clouds have noise of about 1% (A1).
+- Outliers hurt only in large numbers (Chamfer 7.1 at 10% nominal, 4.4% measured), but the filtered VGGT clouds
+  have almost none (0.3 to 0.6% of points beyond 5% of the size).
+- Missing surface hurts most: Chamfer 3.1 / 4.4 / 7.3 at 10 / 25 / 50% missing. The filtered VGGT clouds cover only
+  40% (set A) and 43% (set B) of the GT surface, although the 8 cameras see 75% of it. On the missing-surface axis
+  the real clouds sit on the extension of the synthetic curve (figure); on the noise axis they do not.
+- Decomposition (A3, set A): of the Chamfer gap between clean points (2.74) and the real cloud (10.32), surface the
+  rig never sees accounts for 24%, visible surface that the points stage loses for 48%, VGGT-level noise and bias for
+  4%, and 23% is left (correlated structure of real depth errors that independent noise does not reproduce).
+- Across all 19 real clouds (A4), missing surface is the statistic that tracks Chamfer (ρ = +0.78, p < 0.001);
+  noise does not (ρ = +0.25). Noise correlates with F1@0.02 only.
+- Noise is what multiplies vertices and inflates size: #V 256 to 1,247 at 1% noise and 1,718 at 2%; size 1.02 to
+  1.05 and 1.09. That explains last night's "5 to 6 times more vertices" and most of the 5 to 6% size bias.
+  Missing surface does not add vertices (≈300 at 50% missing).
+
+**2. Where the surface is lost: the multi-view filter.** On pencilpot, VGGT's raw depth covers 77% of the surface;
+silhouette erosion keeps all of it; the multi-view check (2 other views within 1% depth) cuts it to 35%, and the
+outlier filter and cap to 29%. The filter was tuned on pencilpot for clean points, which it delivers, at the price of
+most of the surface.
+
+**3. Route (a) works without a GPU: TSDF fusion.** Fusing every eroded pixel of the 8 depth maps (Open3D, CPU, about
+20 s per shape) keeps the coverage (76 to 77%) and averages the noise:
+- set B (clean test set): mesh Chamfer 9.58 to 6.24, F1@0.02 0.436 to 0.598, NC 0.806 to 0.819, #V 1,440 to 933;
+  better on 12 of 12 shapes for both Chamfer and F1.
+- set A: Chamfer 10.32 to 5.98 (7 of 7), F1@0.02 0.473 to 0.688 (6 of 7).
+- The control matters: dropping the multi-view filter without fusing ("relaxed") also restores coverage but lets
+  through layered, biased points (bias 1.0 to 1.2% vs 0.5 to 0.7% after fusion) and outliers; MeshFlow then
+  fails badly on some shapes (set A Chamfer 12.0 ± 11.3, set B 9.98, size 1.15 to 1.22). Fusion, not just keeping more
+  pixels, is what helps.
+- TSDF closes about half of the Chamfer gap to the upper bound: 50% on set B (9.58 to 6.24 vs 2.93), 57% on set A.
+
+**4. Point head vs depth unprojection: no difference.** With VGGT's own focal (the only fair setting for the point
+head), mesh Chamfer 11.91 vs 11.77 and F1@0.02 0.391 vs 0.406 (set A); points Chamfer 10.95 vs 11.01. The known-focal
+depth unprojection stays the best single-cloud option (10.32). The point head is not a way around the focal error.
+
+**What this means for the strategy question (points vs mesher).** Both routes stay open, but the result changes what
+"robust mesher" has to mean: MeshFlow already tolerates the noise level of real clouds. What it cannot do is
+complete large unseen regions: 24% of the surface is never seen by the rig, and that alone costs about a quarter of
+the gap. A mesher-side contribution would be completion of missing surface (and vertex economy under noise), not
+denoising. On the points side, TSDF fusion is a cheap win that can become the default points stage; the Gaussian
+centres experiment fits the Mac (status.md).
+
+**Caveats.** One MeshFlow seed (42); the seed spread on set A is 0.30 Chamfer, far below these effects. TSDF settings
+were chosen on pencilpot (dev) only, with point-level metrics; set A and set B were never used to tune them.
+Synthetic renders, 8 views, known focal. Coverage is measured with the GT (diagnostic only); nothing measured here
+feeds back into the pipeline.

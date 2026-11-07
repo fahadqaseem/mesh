@@ -5,14 +5,14 @@ Fahad Qaseem Khawar. Numbers from the overnight run of 7 Nov (full tables: `docs
 ## Update
 
 **Done this week**
-- The pipeline runs end to end on my MacBook: Thingi10K renders, VGGT points (8 views), CVPR MeshFlow, scored with MeshFlow's protocol plus NC and F1.
-- 12 new held-out shapes: Chamfer 9.6 (a perfect mesh scores 2.4), NC 0.81, F1@0.02 0.44, about 1,440 vertices. The 7 earlier shapes agree.
-- Upper bound, MeshFlow on clean GT points: Chamfer 2.9, NC 0.94, F1@0.02 0.98, about 265 vertices.
+- The pipeline runs end to end on my MacBook: Thingi10K renders, VGGT (8 views), CVPR MeshFlow.
+- 12 held-out shapes: Chamfer 9.6 (perfect: 2.4), F1@0.02 0.44, about 1,440 vertices. MeshFlow on clean GT points: Chamfer 2.9, F1@0.02 0.98.
+- Fusing VGGT's depth maps (TSDF, CPU) instead of filtering points: Chamfer 6.2, F1@0.02 0.60, about 930 vertices, better on all 12.
 
 **What I learned**
-- Noisy VGGT points make MeshFlow output 5 to 6 times more vertices.
-- VGGT underestimates the focal by about 7%; I now use the known focal.
-- Without texture, VGGT's camera poses fail on symmetric shapes.
+- Robustness tests: MeshFlow tolerates realistic noise; missing surface explains most of the gap. My filter kept 43% of the surface.
+- Noise is what makes MeshFlow output 5 to 6 times more vertices.
+- VGGT's focal is about 7% short; texture is needed for its poses.
 
 **Questions**
 - The gap is in the points, not the mesher. Should I (a) improve the points (your Gaussian centres idea), or (b) make the mesher robust to noisy points from photos, keeping the contribution on the mesh side?
@@ -20,7 +20,7 @@ Fahad Qaseem Khawar. Numbers from the overnight run of 7 Nov (full tables: `docs
 - 16 views exceeds the Mac's memory: when can I use the lab GPU?
 
 **Next week**
-- First tests of both routes (MeshFlow on corrupted clean points; TSDF fusion of VGGT depth), then 16 views on the lab GPU.
+- TSDF as the default points stage, Gaussian centres (fits the Mac), 16 views on the lab GPU.
 
 ## Headline numbers
 
@@ -30,13 +30,18 @@ render cameras (no ICP after meshing), so scale and position errors count. Size 
 
 Shape sets: pencilpot was used to tune the point filters, so it is the **dev shape**: shown, but not in any mean.
 **Set A** = the other 7 original shapes. **Set B** = 12 new Thingi10K shapes picked automatically and never looked at
-before the run: the clean test set. Mean ± std over shapes, MeshFlow seed 42. Lower Chamfer and Hausdorff are better.
+before the run: the clean test set. Mean ± std over shapes, MeshFlow seed 42. Lower Chamfer and Hausdorff are better. "Pipeline mesh" rows without a
+label use the filtered points (current default); the TSDF rows are from the 7 Nov robustness run
+(`docs/results/2026-11-08_robustness.md`; TSDF settings chosen on pencilpot only).
 
 | stage | set | n | Chamfer | Hausdorff | NC | F1@0.01 | F1@0.02 | #V | size |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|
 | Pipeline mesh | **B (test)** | 12 | **9.58 ± 2.98** | 29.1 ± 11.0 | **0.806 ± 0.044** | 0.235 ± 0.099 | **0.436 ± 0.141** | **1,440 ± 799** | 1.06 ± 0.03 |
 | Pipeline mesh | A | 7 | 10.32 ± 3.73 | 28.0 ± 9.9 | 0.769 ± 0.071 | 0.298 ± 0.154 | 0.473 ± 0.181 | 1,682 ± 1,202 | 1.05 ± 0.02 |
 | Pipeline mesh | dev (pencilpot) | 1 | 10.25 | 31.2 | 0.776 | 0.148 | 0.305 | 918 | 1.08 |
+| Pipeline mesh, TSDF-fused depth (new) | **B (test)** | 12 | **6.24 ± 1.87** | 22.7 ± 10.3 | **0.819 ± 0.039** | 0.335 ± 0.131 | **0.598 ± 0.146** | **933 ± 379** | 1.09 ± 0.04 |
+| Pipeline mesh, TSDF-fused depth (new) | A | 7 | 5.98 ± 1.94 | 22.0 ± 9.8 | 0.812 ± 0.083 | 0.386 ± 0.095 | 0.688 ± 0.136 | 864 ± 395 | 1.08 ± 0.04 |
+| Pipeline mesh, TSDF-fused depth (new) | dev (pencilpot) | 1 | 7.05 | 26.8 | 0.849 | 0.259 | 0.509 | 804 | 1.06 |
 | Pipeline mesh, VGGT's own focal | A | 7 | 11.77 ± 4.70 | 30.9 ± 15.0 | 0.774 ± 0.093 | 0.235 ± 0.164 | 0.406 ± 0.182 | 739 ± 450 | 1.10 ± 0.05 |
 | VGGT points, before meshing | B (test) | 12 | 8.37 ± 3.03 | 27.6 ± 11.7 | 0.810 ± 0.031 | 0.379 ± 0.166 | 0.560 ± 0.150 | (186k points) | - |
 | VGGT points, before meshing | A | 7 | 9.32 ± 3.46 | 27.1 ± 10.6 | 0.800 ± 0.051 | 0.414 ± 0.181 | 0.559 ± 0.153 | (179k points) | - |
@@ -48,6 +53,13 @@ Chamfer of a perfect mesh under this protocol (sampling floor): set B 2.37, set 
 
 ## Other findings
 
+- **Robustness of MeshFlow (set A, clean GT points corrupted on purpose):** noise of 1% of the object size costs
+  little (Chamfer 2.74 to 3.25), outliers matter only at 10% (7.1), missing surface matters most (3.1 / 4.4 / 7.3 at
+  10 / 25 / 50% missing). Splitting the real gap (clean 2.74 to real cloud 10.32): surface the 8 cameras never see 24%,
+  visible surface lost in my points stage 48%, noise and bias 4%, rest 23%. The multi-view filter was the culprit: it
+  kept 40 to 43% of the surface although the cameras see 75%. Noise, not missing surface, multiplies the vertices
+  (1% noise: 4.9x) and inflates the size (1.05 at 1%). Details: `docs/results/2026-11-08_robustness.md`.
+- **VGGT point head vs depth unprojection:** no difference (set A, VGGT's own focal: Chamfer 11.91 vs 11.77).
 - **Seed spread is small** (set A, MeshFlow seeds 42, 7, 123): std across seeds vs across shapes is 0.30 vs 3.53 for
   Chamfer and 0.022 vs 0.176 for F1@0.02. Vertex count varies more with the seed (553 vs 1,061). 3-seed means for set A:
   Chamfer 10.23, F1@0.02 0.491.
