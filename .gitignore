@@ -1,0 +1,25 @@
+# big or generated stuff stays off GitHub
+data/
+outputs/
+ckpt/
+third_party/
+*.pth
+*.pt
+*.safetensors
+
+# python
+__pycache__/
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# editors / OS
+.DS_Store
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+
+# local Claude settings
+.claude/settings.local.json

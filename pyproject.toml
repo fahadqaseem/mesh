@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "photo2mesh"
+version = "0.1.0"
+description = "Multi-view photos to lightweight, high-fidelity anisotropic meshes"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy",
+  "scipy",
+  "trimesh",
+  "pyyaml",
+  "pillow",
+  "tqdm",
+]
+
+[project.optional-dependencies]
+gpu = ["torch", "torchvision", "huggingface_hub"]   # VGGT + MeshFlow
+render = ["pyrender"]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

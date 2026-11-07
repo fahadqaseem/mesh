@@ -1,0 +1,24 @@
+# Default settings. Copy to configs/<experiment>.yaml to change things per experiment.
+
+points:
+  use_depth_unprojection: true   # VGGT authors: depth + cameras is more accurate than the point head
+  conf_percentile: 50            # drop the least confident half of pixels
+  min_conf: 1.0
+  outlier_k: 16
+  outlier_std: 2.0
+  voxel: 0.0                     # 0 = no downsampling; try 0.005 on big scenes
+  normal_k: 20                   # neighbours for PCA normals
+
+mesh:
+  mesher: meshflow_cvpr          # meshflow_cvpr | hdpea
+  meshflow_cvpr:
+    ckpt_dir: ckpt/meshflow
+    steps: 28
+    seed: 42
+    dtype: fp16                  # forced to fp32 off CUDA
+    num_verts: null              # rough target vertex count, null = model decides
+  hdpea: {}
+
+eval:
+  n_samples: 100000
+  tau: 0.01
