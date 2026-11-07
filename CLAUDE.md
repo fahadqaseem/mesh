@@ -79,3 +79,16 @@ current so that chat always sees the real state without being told.
 - docs/decisions.md: add a row whenever a direction is chosen (by Fahad, Prof. Zhong, or a result that forces it).
 - If a strategy question comes up that Fahad should decide, write it under "Open questions" in status.md and
   carry on with the safest option instead of stopping.
+
+## Mac memory rules (added 2026-11-07 after a kernel panic)
+
+The MacBook (M4 Pro, 24 GB unified memory, disk ~96% full) froze and restarted at about 00:15 on 2026-11-07:
+a watchdog timeout from memory and swap exhaustion. VGGT on 16 views peaked at ~19 GB, and the 4.5 GB MeshFlow
+checkpoint was loaded on top of that. Until heavy work moves to the lab GPU:
+- Run ONE heavy job at a time (VGGT, MeshFlow, ICP on millions of points). Never run things in parallel or in the background alongside another heavy job.
+- VGGT on the Mac: at most 8 views at a time, or process views in chunks. Free memory between scenes (separate processes, one per scene).
+- Downsample before saving points (voxel ~0.005 in unit scale, or cap at ~200k points). 2M-point clouds are wasteful; MeshFlow resamples anyway.
+- Load MeshFlow in one process per run and exit afterwards; do not keep CPU and MPS copies alive together.
+- Before a heavy run, check free memory (`vm_stat` / `memory_pressure`). If pressure is high, stop and say so instead of starting.
+- Delete raw.npz and other large intermediates that can be regenerated; keep outputs/ small.
+- Anything that needs more than this goes to the lab GPU. Note it in status.md under "Blocked".
