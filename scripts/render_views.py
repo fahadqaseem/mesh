@@ -7,7 +7,8 @@ Usage:
 Writes, next to the images folder (the scene dir):
     gt_cam_poses.npy   (V, 4, 4) camera-to-world, OpenGL convention, in the normalised frame
     gt_normalized.ply  the GT mesh in that same frame (rotated to Y-up, centred, unit sphere)
-    gt_transform.json  how the raw mesh was mapped into that frame
+    gt_transform.json  how the raw mesh was mapped into that frame, plus the camera rig (shared by every images folder)
+and, inside the images folder: render.json (texture and seed of that folder's images)
 Needs: pip install pyrender  (on a headless Linux box also set PYOPENGL_PLATFORM=egl)
 """
 from __future__ import annotations
@@ -127,9 +128,12 @@ def main() -> None:
     scene_dir = out.parent
     np.save(scene_dir / "gt_cam_poses.npy", np.stack(poses))
     mesh.export(scene_dir / "gt_normalized.ply")
+    # scene-level: geometry + camera rig only (identical for grey and textured renders of the same mesh)
     meta = {**transform, "source_mesh": str(args.mesh), "up": args.up, "elevations": elevations,
-            "views_per_ring": args.n, "yfov_deg": 40, "size": args.size, "texture": args.texture, "seed": args.seed}
+            "views_per_ring": args.n, "yfov_deg": 40, "size": args.size}
     (scene_dir / "gt_transform.json").write_text(json.dumps(meta, indent=2))
+    # folder-level: what these particular images look like
+    (out / "render.json").write_text(json.dumps({"texture": args.texture, "seed": args.seed}, indent=2))
     print(f"[render] {len(poses)} views ({args.texture}) -> {out}")
 
 

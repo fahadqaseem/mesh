@@ -3,10 +3,10 @@
 One entry per run. Newest on top. Claude: append here after every run, and keep "Next up" current.
 
 ## Next up
-0. [ ] RUNNING (started 2026-11-07 01:27): overnight queue, steps 1-5 (see status.md). Results: docs/results/2026-11-07_overnight.md.
-1. [ ] Read the overnight report, log one entry per step here, write the Friday summary.
-2. [ ] Depth quality: VGGT point head vs depth unprojection; per-view depth scale check against multi-view consensus.
-3. [ ] Lab GPU: VGGT with 16 views, as an 8 vs 16 comparison.
+1. [ ] Points-stage quality, the bottleneck (pipeline CD ~10 vs 2.9 on clean input): VGGT point head vs depth unprojection;
+       per-view depth scale check against the multi-view consensus; look at thickness of the cloud.
+2. [ ] Size bias (meshes 5-6% too large): where does it come from (remaining halo, cloud thickness, MeshFlow's 1-2%)?
+3. [ ] Lab GPU: VGGT with 16 views, as an 8 vs 16 comparison (also 3 MeshFlow seeds on set B).
 4. [ ] Experiment: Gaussian centres vs interpolated points as MeshFlow input.
 5. [ ] Guidance 2.5 vs 1.0 numerical check (own process).
 6. [ ] December (with the colour render-back loop, priority 2): add Google Scanned Objects for real textures.
@@ -15,7 +15,8 @@ Done: env + pytest (11-06); MeshFlow weights downloaded (11-07); 8 Thingi10K sha
 procedural texture); VGGT on all 8 scenes (16 views); alignment stage (camera Umeyama + ICP); point-cloud evaluation;
 MeshFlow CPU vs MPS timing (11-07); input ablation on pencilpot (11-07); point cap 200k + raw.npz opt-in;
 eval protocol v1 (11-07); Part A: 8 views + known focal + multi-view filter (11-07); hybrid MeshFlow (11-07);
-overnight tooling (11-07).
+overnight tooling (11-07); overnight run, 215 jobs, steps 1-5 (11-07);
+Friday summary docs/results/2026-11-13_friday_summary.md (11-07).
 
 ## Template
 ```
@@ -29,6 +30,41 @@ Next:
 ```
 
 ## Runs
+
+### 2026-11-07  overnight_v2  (215 jobs, steps 1-5; protocol v1; pencilpot = dev shape, excluded from means)
+Goal: full pipeline on all shapes with the v2 defaults: results with spread, clean-input upper bound, seed variance,
+  grey vs textured, and a clean test set of 12 new shapes.
+Command: `python scripts/make_overnight_queue.py` then `nohup caffeinate -is scripts/overnight.sh` (01:27 to 02:53, 86 min,
+  215/215 jobs ok, no memory waits; free memory stayed 76-85%).
+Input: set A = 7 original shapes (not used for tuning), set B = 12 new Thingi10K shapes (configs/step5_shapes.txt, picked
+  automatically: clean, 1k-20k faces, not flat), dev = pencilpot (used to tune the filters). Textured, 8 views.
+Config: points default v2 (known focal, multi-view >= 2 within 1%, 2 px erosion, 200k cap); MeshFlow hybrid, 28 steps,
+  guidance 1.0, seed 42 (+ 7 and 123 on set A). Full tables: docs/results/2026-11-07_overnight.md.
+Result (mean ± std over shapes; CD/HD x100 MeshFlow definition, F1 in the [-0.5, 0.5] frame):
+  pipeline mesh  set B: CD 9.58 ± 2.98, HD 29.1, NC 0.806, F1@0.01 0.235, F1@0.02 0.436 ± 0.141, #V 1,440, size 1.06
+  pipeline mesh  set A: CD 10.32 ± 3.73, HD 28.0, NC 0.769, F1@0.01 0.298, F1@0.02 0.473 ± 0.181, #V 1,682, size 1.05
+  VGGT focal     set A: CD 11.77, NC 0.774, F1@0.02 0.406, #V 739, size 1.10 (known focal is better on 6 of 7 shapes)
+  points stage   set B: CD 8.37, NC 0.810, F1@0.02 0.560 | set A: CD 9.32, NC 0.800, F1@0.02 0.559
+  upper bound (MeshFlow on clean GT samples) set B: CD 2.93, NC 0.941, F1@0.02 0.979, #V 265 | set A: CD 2.74, F1@0.02 0.979, #V 256
+  CD floor (perfect mesh): set B 2.37, set A 2.26. Dev pencilpot (not in means): CD 10.25, F1@0.02 0.305, #V 918.
+  seed spread (set A): std across seeds vs across shapes: CD 0.30 vs 3.53, F1@0.02 0.022 vs 0.176, #V 553 vs 1,061.
+  grey vs textured (shackbot, presents, wheel): textured better by +0.50 points F1@0.02 and +0.38 mesh F1@0.02.
+  Time per mesh 51 s, VGGT (8 views) ~25 s.
+Notes / what I saw:
+  - The test set (B) is no worse than set A: tuning the filters on pencilpot did not overfit.
+  - MeshFlow on clean input is near the sampling floor (CD 2.9 vs 2.4). The pipeline sits at ~10: the VGGT points are the
+    bottleneck. Noisy input also gives 5-6x more vertices (ratio of means 6.6x set A, 5.4x set B) and lower triangle
+    quality (G 0.49 vs 0.54-0.57).
+  - VGGT's focal was short on 18 of 19 shapes (mean ratio 0.93; set B 12 of 12).
+  - Grey renders: VGGT camera poses failed on presents and wheel (camera fit error 2.4 on a rig of radius 3, vs 0.013-0.020
+    textured). Symmetric shapes look the same from different sides; texture breaks the symmetry. Shackbot grey was worse
+    but did not fail (0.061 vs 0.032). Dev pencilpot (asymmetric): grey better on F1, slightly worse on CD.
+  - Meshes are 5-6% too large on both sets; MeshFlow alone adds 1-2% (clean input), so most of it comes from the cloud.
+  - Housekeeping found on the way: re-rendering grey overwrote the scene's gt_transform.json "texture" field. Fixed:
+    texture and seed now live in <images folder>/render.json; gt_transform.json keeps geometry and cameras only.
+Takeaway: the pipeline works and generalises to new shapes (set B CD 9.6, NC 0.81, F1@0.02 0.44, ~1,440 verts); the
+  remaining gap to the clean-input upper bound (CD 2.9, F1@0.02 0.98) is almost all in the VGGT points.
+Next: points-stage quality (depth noise, size bias); 16 views on the lab GPU; Gaussian centres vs interpolated points.
 
 ### 2026-11-07  pencilpot_299291_tex_v2  (Part A: 8 views + floater fixes; protocol v1)
 Goal: 8-view VGGT (Mac memory rule) with an edge-pixel fix, confirmed on pencilpot against the old 16-view run.
