@@ -23,6 +23,8 @@ def main() -> None:
     ap.add_argument("--images", required=True)
     ap.add_argument("--run", required=True)
     ap.add_argument("--config", default="configs/default.yaml")
+    ap.add_argument("--keep-raw", action="store_true",
+                    help="also save the unfiltered VGGT output as raw.npz (~115 MB per 16-view scene)")
     ap.add_argument("--reuse-raw", action="store_true",
                     help="skip VGGT and reload outputs/<run>/points/raw.npz (to re-tune filtering)")
     args = ap.parse_args()
@@ -36,7 +38,8 @@ def main() -> None:
         pred = dict(np.load(raw_path))
     else:
         pred = run_vggt(list_images(args.images), use_depth_unprojection=cfg["use_depth_unprojection"])
-        np.savez(raw_path, **pred)   # unfiltered VGGT output, so filtering can be rerun alone
+        if args.keep_raw:
+            np.savez(raw_path, **pred)   # unfiltered VGGT output, so filtering can be rerun alone
     np.savez(out_dir / "cameras.npz", extrinsic=pred["extrinsic"], intrinsic=pred["intrinsic"],
              cam_centres=pred["cam_centres"])
     flat = flatten_views(pred)
@@ -49,7 +52,11 @@ def main() -> None:
     if cfg["voxel"]:
         pts, cols, views = voxel_downsample(pts, cfg["voxel"], cols, views)
 
-    normals = estimate_normals(pts, viewpoints=views, k=cfg["normal_k"])
+    normals = estimate_normals(pts, viewpoints=views, k=cfg["normal_k"])   # on the dense cloud: better normals
+    cap = cfg.get("max_points") or 0
+    if cap and len(pts) > cap:
+        idx = np.sort(np.random.default_rng(0).choice(len(pts), cap, replace=False))
+        pts, normals, cols = pts[idx], normals[idx], cols[idx]
     save_points_ply(out_dir / "points.ply", pts, normals=normals, colors=cols)
     print(f"[points] {len(pts):,} points -> {out_dir / 'points.ply'}")
 

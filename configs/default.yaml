@@ -7,6 +7,7 @@ points:
   outlier_k: 16
   outlier_std: 2.0
   voxel: 0.0                     # 0 = no downsampling; try 0.005 on big scenes
+  max_points: 200000             # random cap after normals (Mac memory rule; MeshFlow resamples 4096 anyway)
   normal_k: 20                   # neighbours for PCA normals
 
 mesh:
