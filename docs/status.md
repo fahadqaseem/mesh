@@ -14,11 +14,11 @@ Snapshot, rewritten at the end of every work block. Last updated: 2026-11-07.
   Waiting on Fahad (see Open questions). Until then, no new VGGT runs.
 - 16-view VGGT, and anything that keeps VGGT and MeshFlow in memory together, waits for the lab GPU (Mac crash on 2026-11-07).
 
-## Current numbers (pencilpot, MeshFlow on MPS, rigid ICP, n=100k, tau=0.01)
+## Current numbers (pencilpot, MeshFlow on MPS; old protocol: rigid ICP, n=100k, tau=0.01; to be rescored)
 | MeshFlow input | Chamfer | NC | F1 | size vs GT |
 |---|---|---|---|---|
 | VGGT points as is | 0.0334 | 0.731 | 0.088 | 0.86 |
-| VGGT, floaters removed (oracle, uses GT) | 0.0115 | 0.884 | 0.369 | 0.98 |
+| DIAGNOSTIC ONLY, not a result: VGGT with floaters removed using the GT | 0.0115 | 0.884 | 0.369 | 0.98 |
 | GT surface samples (upper bound) | 0.0004 | 0.955 | 0.488 | 1.02 |
 - Main finding: floaters in the VGGT cloud (flying pixels at depth edges) cause MeshFlow's spikes and the ~14% shrink.
   The input stage is the bottleneck, not MeshFlow.
@@ -32,13 +32,6 @@ Snapshot, rewritten at the end of every work block. Last updated: 2026-11-07.
 3. Seed variance for MeshFlow (the mesh changes a lot between runs), so differences in the table can be judged.
 
 ## Open questions
-- **8 vs 16 views for the VGGT rerun.** The floater fix needs new VGGT runs. Options: (a) 8 views on the Mac (4 per ring,
-  every other camera), which is allowed by the memory rules but differs from your 16-view setup; (b) wait for the lab GPU
-  and keep 16. Safest for now: no new VGGT runs; I work on things that do not need them.
-- **Metric protocol.** F1 at tau 0.01 (unit sphere, 100k samples) is capped at 0.93-1.00 even for a perfect mesh, and it
-  punishes lightweight meshes: MeshFlow on clean input gets chamfer 4e-4 but F1 0.49 (flat facets). What normalisation,
-  sample count and tau does HD-PEA use? Worth asking Hongbo, so our numbers line up with the lab's.
-- **Scale in scoring.** Meshes are scored after rigid ICP (no scale), so size errors count against them. Keep it that way?
-- **Texture.** The procedural texture did not help VGGT on pencilpot. Try grey on one more shape (needs a VGGT run,
-  so it waits for the view-count answer), or keep textured as the default since it is needed for the colour loop anyway?
-- (Answered 2026-11-06: procedural texture now, Google Scanned Objects in December; Y-up + 2 rings x 8 views.)
+- None open. Answered 2026-11-07 (see decisions.md): 8-view VGGT on the Mac now, 16 on the lab GPU later; no HD-PEA
+  dependency; scoring protocol in docs/eval_protocol.md; scale errors stay in the score (camera alignment only, no ICP);
+  texture stays the default; the GT-cleaned input is diagnostic only; MPS sampling + CPU extraction if the hybrid checks out.

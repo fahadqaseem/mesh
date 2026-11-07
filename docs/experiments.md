@@ -3,11 +3,14 @@
 One entry per run. Newest on top. Claude: append here after every run, and keep "Next up" current.
 
 ## Next up
-1. [ ] Depth-edge (flying pixel) filter in run_points.py, then VGGT rerun. Waiting on Fahad: 8 views on the Mac, or 16 on the lab GPU?
+1. [ ] Depth-edge (flying pixel) filter in run_points.py, then VGGT rerun with 8 views (4 per ring), one scene at a time.
+1b.[ ] Write docs/eval_protocol.md; rescore without ICP (camera alignment only), F1 at 0.01 and 0.02.
 2. [x] Points table for all 8 scenes (11-07). Grey vs textured: textured not better on pencilpot; check one more shape grey.
 3. [ ] MeshFlow on all 8 scenes (after the floater fix), then the first results table with the F1 ceiling. For Friday's meeting.
 4. [ ] Seed variance: MeshFlow with 3 to 5 seeds on one input, so differences between runs can be judged.
-5. [ ] Adapter: DiT on MPS, decode/extract on CPU (~30 s saved per mesh). Also the guidance 2.5 vs 1.0 check (own process).
+5. [ ] Adapter: DiT on MPS, decode/extract on CPU (~30 s saved per mesh), default if it checks out. Guidance 2.5 vs 1.0 check (own process).
+5b.[ ] Grey vs textured on 2 to 3 more shapes (when convenient).
+5c.[ ] Lab GPU later: VGGT with 16 views, as an 8 vs 16 comparison.
 6. [ ] Experiment: Gaussian centres vs interpolated points as MeshFlow input.
 7. [ ] December (with the colour render-back loop, priority 2): add Google Scanned Objects for real textures.
 
@@ -62,12 +65,12 @@ Next: floater fix (waiting on the view-count answer), then rerun this table.
 Goal: find the cause of the spikes, split and shrink in the first MeshFlow mesh.
 Command: `python scripts/bench_meshflow.py --points <input>.ply --device mps --out outputs/pencilpot_299291_tex_v1/ablation/<name>`
 Input (all in the GT frame, MeshFlow resamples 4096 points from each):
-  (a) VGGT points as is (200k cap); (b) the same with floaters removed using the GT (points > 0.03 from the GT surface dropped,
-  6.3% of points); diagnostic only, not a real method; (c) 200k clean GT surface samples (upper bound for the mesher).
+  (a) VGGT points as is (200k cap); (b) DIAGNOSTIC ONLY, not a result: the same with floaters removed using the GT (points > 0.03 from the
+  GT surface dropped, 6.3% of points); (c) 200k clean GT surface samples (upper bound for the mesher).
 Config: real checkpoint, fp32, MPS, 28 steps, seed 42, guidance 1.0. Scored after rigid ICP (no scale), n=100k, tau=0.01.
 Result:
   (a) VGGT as is:         chamfer=0.0334  nc=0.731  f1=0.088  verts=3770 faces=11763  size vs GT 0.86  spikes
-  (b) floaters removed:   chamfer=0.0115  nc=0.884  f1=0.369  verts=1442 faces=7449   size vs GT 0.98  no spikes; split at mouth, ragged holes
+  (b) DIAGNOSTIC ONLY (GT-cleaned): chamfer=0.0115  nc=0.884  f1=0.369  verts=1442 faces=7449   size vs GT 0.98  no spikes; split at mouth, ragged holes
   (c) GT samples:         chamfer=0.0004  nc=0.955  f1=0.488  verts=361  faces=746    size vs GT 1.02  clean low-poly mesh
   Picture: outputs/pencilpot_299291_tex_v1/ablation/compare_inputs.png
 Notes / what I saw:
