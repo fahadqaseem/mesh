@@ -23,13 +23,20 @@ def main() -> None:
     ap.add_argument("--images", required=True)
     ap.add_argument("--run", required=True)
     ap.add_argument("--config", default="configs/default.yaml")
+    ap.add_argument("--reuse-raw", action="store_true",
+                    help="skip VGGT and reload outputs/<run>/points/raw.npz (to re-tune filtering)")
     args = ap.parse_args()
     cfg = yaml.safe_load(open(args.config))["points"]
 
     out_dir = Path("outputs") / args.run / "points"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    pred = run_vggt(list_images(args.images), use_depth_unprojection=cfg["use_depth_unprojection"])
+    raw_path = out_dir / "raw.npz"
+    if args.reuse_raw and raw_path.exists():
+        pred = dict(np.load(raw_path))
+    else:
+        pred = run_vggt(list_images(args.images), use_depth_unprojection=cfg["use_depth_unprojection"])
+        np.savez(raw_path, **pred)   # unfiltered VGGT output, so filtering can be rerun alone
     np.savez(out_dir / "cameras.npz", extrinsic=pred["extrinsic"], intrinsic=pred["intrinsic"],
              cam_centres=pred["cam_centres"])
     flat = flatten_views(pred)

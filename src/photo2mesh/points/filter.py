@@ -6,10 +6,14 @@ from scipy.spatial import cKDTree
 
 
 def confidence_mask(conf: np.ndarray, percentile: float = 50.0, min_conf: float = 1.0) -> np.ndarray:
-    """Keep points above a confidence percentile (VGGT confidences are unbounded, >= 1)."""
+    """Keep points at or above a confidence percentile and strictly above ``min_conf``.
+
+    VGGT confidences are 1 + exp(x) >= 1, and background pixels sit exactly on the floor of 1.0.
+    When over half the image is background, the percentile itself is 1.0, so the floor must be a
+    strict bound or every background pixel survives.
+    """
     conf = np.asarray(conf).reshape(-1)
-    thresh = max(np.percentile(conf, percentile), min_conf)
-    return conf >= thresh
+    return (conf >= np.percentile(conf, percentile)) & (conf > min_conf)
 
 
 def remove_statistical_outliers(points: np.ndarray, k: int = 16, std_ratio: float = 2.0) -> np.ndarray:
