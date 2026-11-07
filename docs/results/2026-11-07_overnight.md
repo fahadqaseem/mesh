@@ -1,6 +1,6 @@
 # Overnight results, 2026-11-07
 
-Generated 2026-11-07 01:52 by `scripts/overnight_report.py` from `outputs/` (not in git).
+Generated 2026-11-07 02:08 by `scripts/overnight_report.py` from `outputs/` (not in git).
 
 Protocol v1 (`docs/eval_protocol.md`): camera-only alignment, no ICP; GT in [-0.5, 0.5]; CD/HD x100 at 5k samples
 (MeshFlow definition, not squared); NC and F1 at 100k samples; size = mesh max extent / GT max extent (1 = right size).
@@ -16,7 +16,7 @@ Shape sets: **dev** = pencilpot_299291 (used to tune the filter thresholds; show
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|
 | Pipeline mesh, known focal (seed 42) | A | 7 | 10.32 ± 3.73 (4.94-15.16) | 28.0 ± 9.9 (15.1-41.2) | 0.769 ± 0.071 (0.642-0.841) | 0.298 ± 0.154 (0.103-0.508) | 0.473 ± 0.181 (0.231-0.723) | 1,682 ± 1,202 (240-3,904) | 1.05 ± 0.02 (1.03-1.09) |
 | Pipeline mesh, known focal (seed 42) | B test | 0 | - | - | - | - | - | - | - |
-| Pipeline mesh, known focal (mean of 3 seeds per shape) | A | 0 | - | - | - | - | - | - | - |
+| Pipeline mesh, known focal (mean of 3 seeds per shape) | A | 7 | 10.23 ± 3.53 (5.09-14.78) | 28.5 ± 9.3 (16.5-40.7) | 0.784 ± 0.074 (0.641-0.856) | 0.333 ± 0.168 (0.123-0.580) | 0.491 ± 0.176 (0.252-0.727) | 1,594 ± 1,061 (323-3,143) | 1.04 ± 0.02 (1.02-1.07) |
 | Pipeline mesh, VGGT focal (uncalibrated, seed 42) | A | 7 | 11.77 ± 4.70 (6.65-18.73) | 30.9 ± 15.0 (9.3-55.2) | 0.774 ± 0.093 (0.587-0.860) | 0.235 ± 0.164 (0.072-0.515) | 0.406 ± 0.182 (0.152-0.680) | 739 ± 450 (202-1,513) | 1.10 ± 0.05 (1.02-1.14) |
 | Upper bound: MeshFlow on clean GT samples (seed 42) | A | 7 | 2.74 ± 0.63 (1.55-3.60) | 4.2 ± 1.1 (2.3-5.4) | 0.908 ± 0.102 (0.685-0.977) | 0.815 ± 0.149 (0.627-0.975) | 0.979 ± 0.040 (0.890-1.000) | 256 ± 162 (53-473) | 1.02 ± 0.01 (1.01-1.03) |
 | Upper bound: MeshFlow on clean GT samples (seed 42) | B test | 0 | - | - | - | - | - | - | - |
@@ -25,7 +25,7 @@ Shape sets: **dev** = pencilpot_299291 (used to tune the filter thresholds; show
 
 CD floor (what a perfect mesh scores under this protocol): set A 2.26 ± 0.53 (1.27-2.85), set B -.
 
-Seed spread (set A, 0 shapes with all 3 seeds; average std across seeds vs std across shapes): pending.
+Seed spread (set A, 7 shapes with all 3 seeds; average std across seeds vs std across shapes): CD: across seeds 0.30 vs across shapes 3.53; F1@0.02: across seeds 0.022 vs across shapes 0.176; V: across seeds 553 vs across shapes 1,061.
 
 Grey vs textured (0 of 3 shapes, dev shape excluded; textured minus grey): points F1@0.02 -; mesh CD -; mesh F1@0.02 -; VGGT focal ratio grey - vs textured 0.942 ± 0.052 (0.882-0.979).
 
@@ -33,7 +33,7 @@ Grey vs textured (0 of 3 shapes, dev shape excluded; textured minus grey): point
 
 - step 1: 72 of 72 jobs run (ok 72)
 - step 2: 16 of 16 jobs run (ok 16)
-- step 3: 0 of 16 jobs run (not started)
+- step 3: 16 of 16 jobs run (ok 16)
 - step 4: 0 of 27 jobs run (not started)
 - step 5: 0 of 84 jobs run (not started)
 
@@ -119,17 +119,17 @@ Per shape: mean ± std over seeds.
 
 | shape | seeds | CD | HD | NC | F1@0.01 | F1@0.02 | V | size_ratio |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| pencilpot_299291 (dev, not in means) | 1 | 10.25 | 31.2 | 0.776 | 0.148 | 0.305 | 918 | 1.08 |
-| cylinder_472094 | 1 | 4.94 | 15.1 | 0.751 | 0.508 | 0.723 | 3,904 | 1.05 |
-| shackbot_94155 | 1 | 15.16 | 39.9 | 0.827 | 0.113 | 0.258 | 2,261 | 1.07 |
-| nsphere_186199 | 1 | 12.94 | 29.2 | 0.820 | 0.103 | 0.231 | 1,243 | 1.03 |
-| wheel_76903 | 1 | 9.39 | 26.7 | 0.841 | 0.328 | 0.510 | 1,283 | 1.04 |
-| presents_98021 | 1 | 13.07 | 41.2 | 0.717 | 0.327 | 0.473 | 240 | 1.09 |
-| monsterring_1356640 | 1 | 10.44 | 26.0 | 0.784 | 0.448 | 0.641 | 781 | 1.03 |
-| cryptex_105686 | 1 | 6.32 | 17.8 | 0.642 | 0.256 | 0.472 | 2,065 | 1.04 |
-| **set A: mean ± std of per-shape means, n=0** | | - | - | - | - | - | - | - |
+| pencilpot_299291 (dev, not in means) | 3 | 10.02 ± 0.20 | 31.0 ± 0.2 | 0.786 ± 0.011 | 0.149 ± 0.022 | 0.339 ± 0.034 | 1,430 ± 866 | 1.06 ± 0.02 |
+| cylinder_472094 | 3 | 5.09 ± 0.59 | 16.5 ± 2.3 | 0.794 ± 0.058 | 0.580 ± 0.066 | 0.727 ± 0.019 | 3,143 ± 1,312 | 1.05 ± 0.01 |
+| shackbot_94155 | 3 | 14.78 ± 0.33 | 39.9 ± 0.1 | 0.845 ± 0.017 | 0.153 ± 0.035 | 0.294 ± 0.031 | 2,645 ± 1,008 | 1.05 ± 0.02 |
+| nsphere_186199 | 3 | 12.75 ± 0.19 | 29.5 ± 0.7 | 0.820 ± 0.008 | 0.123 ± 0.027 | 0.252 ± 0.023 | 1,178 ± 426 | 1.04 ± 0.01 |
+| wheel_76903 | 3 | 9.55 ± 0.45 | 28.1 ± 1.4 | 0.856 ± 0.016 | 0.369 ± 0.041 | 0.552 ± 0.036 | 1,143 ± 428 | 1.04 ± 0.01 |
+| presents_98021 | 3 | 12.77 ± 0.26 | 40.7 ± 0.6 | 0.739 ± 0.021 | 0.332 ± 0.006 | 0.473 ± 0.004 | 323 ± 107 | 1.07 ± 0.02 |
+| monsterring_1356640 | 3 | 10.24 ± 0.18 | 25.7 ± 0.4 | 0.792 ± 0.008 | 0.499 ± 0.044 | 0.665 ± 0.021 | 606 ± 254 | 1.02 ± 0.01 |
+| cryptex_105686 | 3 | 6.45 ± 0.12 | 18.9 ± 1.3 | 0.641 ± 0.006 | 0.273 ± 0.019 | 0.472 ± 0.018 | 2,123 ± 338 | 1.03 ± 0.00 |
+| **set A: mean ± std of per-shape means, n=7** | | 10.23 ± 3.53 | 28.5 ± 9.3 | 0.784 ± 0.074 | 0.333 ± 0.168 | 0.491 ± 0.176 | 1,594 ± 1,061 | 1.04 ± 0.02 |
 
-Seed spread (set A, 0 shapes with all 3 seeds; average std across seeds vs std across shapes): pending.
+Seed spread (set A, 7 shapes with all 3 seeds; average std across seeds vs std across shapes): CD: across seeds 0.30 vs across shapes 3.53; F1@0.02: across seeds 0.022 vs across shapes 0.176; V: across seeds 553 vs across shapes 1,061.
 
 ## Step 4: grey vs textured (8 views, default pipeline)
 
@@ -137,10 +137,10 @@ Points stage, then MeshFlow mean over seeds 42/7/123. Focal ratio = VGGT's predi
 
 | shape | pts F1@0.02 grey | pts F1@0.02 tex | pts CD grey | pts CD tex | focal ratio grey | focal ratio tex | mesh CD grey | mesh CD tex | mesh F1@0.02 grey | mesh F1@0.02 tex |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| shackbot_94155 | - | 0.394 | - | 13.26 | - | 0.882 | - | 15.16 | - | 0.258 |
-| presents_98021 | - | 0.538 | - | 11.81 | - | 0.979 | - | 13.07 | - | 0.473 |
-| wheel_76903 | - | 0.659 | - | 8.04 | - | 0.964 | - | 9.39 | - | 0.510 |
-| pencilpot_299291 (dev, not in means) | - | 0.478 | - | 8.79 | - | 0.924 | - | 10.25 | - | 0.305 |
+| shackbot_94155 | - | 0.394 | - | 13.26 | - | 0.882 | - | 14.78 | - | 0.294 |
+| presents_98021 | - | 0.538 | - | 11.81 | - | 0.979 | - | 12.77 | - | 0.473 |
+| wheel_76903 | - | 0.659 | - | 8.04 | - | 0.964 | - | 9.55 | - | 0.552 |
+| pencilpot_299291 (dev, not in means) | - | 0.478 | - | 8.79 | - | 0.924 | - | 10.02 | - | 0.339 |
 
 Grey vs textured (0 of 3 shapes, dev shape excluded; textured minus grey): points F1@0.02 -; mesh CD -; mesh F1@0.02 -; VGGT focal ratio grey - vs textured 0.942 ± 0.052 (0.882-0.979).
 
