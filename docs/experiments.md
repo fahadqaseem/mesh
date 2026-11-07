@@ -3,20 +3,19 @@
 One entry per run. Newest on top. Claude: append here after every run, and keep "Next up" current.
 
 ## Next up
-1. [ ] Depth-edge (flying pixel) filter in run_points.py, then VGGT rerun with 8 views (4 per ring), one scene at a time.
-1b.[ ] Write docs/eval_protocol.md; rescore without ICP (camera alignment only), F1 at 0.01 and 0.02.
-2. [x] Points table for all 8 scenes (11-07). Grey vs textured: textured not better on pencilpot; check one more shape grey.
-3. [ ] MeshFlow on all 8 scenes (after the floater fix), then the first results table with the F1 ceiling. For Friday's meeting.
-4. [ ] Seed variance: MeshFlow with 3 to 5 seeds on one input, so differences between runs can be judged.
-5. [ ] Adapter: DiT on MPS, decode/extract on CPU (~30 s saved per mesh), default if it checks out. Guidance 2.5 vs 1.0 check (own process).
-5b.[ ] Grey vs textured on 2 to 3 more shapes (when convenient).
-5c.[ ] Lab GPU later: VGGT with 16 views, as an 8 vs 16 comparison.
-6. [ ] Experiment: Gaussian centres vs interpolated points as MeshFlow input.
-7. [ ] December (with the colour render-back loop, priority 2): add Google Scanned Objects for real textures.
+0. [ ] RUNNING (started 2026-11-07 01:27): overnight queue, steps 1-5 (see status.md). Results: docs/results/2026-11-07_overnight.md.
+1. [ ] Read the overnight report, log one entry per step here, write the Friday summary.
+2. [ ] Depth quality: VGGT point head vs depth unprojection; per-view depth scale check against multi-view consensus.
+3. [ ] Lab GPU: VGGT with 16 views, as an 8 vs 16 comparison.
+4. [ ] Experiment: Gaussian centres vs interpolated points as MeshFlow input.
+5. [ ] Guidance 2.5 vs 1.0 numerical check (own process).
+6. [ ] December (with the colour render-back loop, priority 2): add Google Scanned Objects for real textures.
 
 Done: env + pytest (11-06); MeshFlow weights downloaded (11-07); 8 Thingi10K shapes rendered v1 (Y-up, 2 rings x 8,
 procedural texture); VGGT on all 8 scenes (16 views); alignment stage (camera Umeyama + ICP); point-cloud evaluation;
-MeshFlow CPU vs MPS timing (11-07); input ablation on pencilpot (11-07); point cap 200k + raw.npz opt-in.
+MeshFlow CPU vs MPS timing (11-07); input ablation on pencilpot (11-07); point cap 200k + raw.npz opt-in;
+eval protocol v1 (11-07); Part A: 8 views + known focal + multi-view filter (11-07); hybrid MeshFlow (11-07);
+overnight tooling (11-07).
 
 ## Template
 ```
