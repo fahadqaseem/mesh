@@ -1,8 +1,14 @@
 # Status
 
-Snapshot, rewritten at the end of every work block. Last updated: 2026-11-07 03:05.
+Snapshot, rewritten at the end of every work block. Last updated: 2026-11-07 12:35 (interim; full rewrite when the queue ends).
 
 ## Latest
+- **Running now (started 12:23, expected to finish about 15:15):** the robustness queue, 600 jobs, 136 MeshFlow runs
+  (`scripts/make_robustness_queue.py`, log `outputs/robustness_queue/runner.log`). Step 1 Experiment A (MeshFlow on
+  corrupted clean points, set A), step 2 Experiment B on set A (TSDF fusion, relaxed filter, point head), step 3 the
+  decomposition, step 4 Experiment B on set B. Results land in `docs/results/2026-11-08_robustness.md` after each step.
+- First finding (dev shape pencilpot): the multi-view filter keeps only 29% of the GT surface (VGGT's raw depth covers
+  77%, the rig sees 75%). TSDF fusion of all eroded pixels keeps 72% and gave mesh Chamfer 7.05 vs 10.25 on pencilpot.
 - Overnight run finished: 215/215 jobs ok (01:27 to 02:53), no failures, no memory waits. Full tables:
   `docs/results/2026-11-07_overnight.md`. Friday summary for Prof. Zhong (13 Nov): `docs/results/2026-11-13_friday_summary.md`.
 - Pencilpot is the dev shape (used to tune the filters): shown in every table, excluded from all means. Set A = the other
