@@ -1,6 +1,6 @@
 # Overnight results, 2026-11-07
 
-Generated 2026-11-07 01:46 by `scripts/overnight_report.py` from `outputs/` (not in git).
+Generated 2026-11-07 01:52 by `scripts/overnight_report.py` from `outputs/` (not in git).
 
 Protocol v1 (`docs/eval_protocol.md`): camera-only alignment, no ICP; GT in [-0.5, 0.5]; CD/HD x100 at 5k samples
 (MeshFlow definition, not squared); NC and F1 at 100k samples; size = mesh max extent / GT max extent (1 = right size).
@@ -18,7 +18,7 @@ Shape sets: **dev** = pencilpot_299291 (used to tune the filter thresholds; show
 | Pipeline mesh, known focal (seed 42) | B test | 0 | - | - | - | - | - | - | - |
 | Pipeline mesh, known focal (mean of 3 seeds per shape) | A | 0 | - | - | - | - | - | - | - |
 | Pipeline mesh, VGGT focal (uncalibrated, seed 42) | A | 7 | 11.77 ± 4.70 (6.65-18.73) | 30.9 ± 15.0 (9.3-55.2) | 0.774 ± 0.093 (0.587-0.860) | 0.235 ± 0.164 (0.072-0.515) | 0.406 ± 0.182 (0.152-0.680) | 739 ± 450 (202-1,513) | 1.10 ± 0.05 (1.02-1.14) |
-| Upper bound: MeshFlow on clean GT samples (seed 42) | A | 0 | - | - | - | - | - | - | - |
+| Upper bound: MeshFlow on clean GT samples (seed 42) | A | 7 | 2.74 ± 0.63 (1.55-3.60) | 4.2 ± 1.1 (2.3-5.4) | 0.908 ± 0.102 (0.685-0.977) | 0.815 ± 0.149 (0.627-0.975) | 0.979 ± 0.040 (0.890-1.000) | 256 ± 162 (53-473) | 1.02 ± 0.01 (1.01-1.03) |
 | Upper bound: MeshFlow on clean GT samples (seed 42) | B test | 0 | - | - | - | - | - | - | - |
 | Points stage: VGGT cloud before meshing (#V = points) | A | 7 | 9.32 ± 3.46 (4.62-13.26) | 27.1 ± 10.6 (13.1-40.3) | 0.800 ± 0.051 (0.692-0.839) | 0.414 ± 0.181 (0.176-0.645) | 0.559 ± 0.153 (0.320-0.727) | 179,489 ± 37,467 (97,891-200,000) | - |
 | Points stage: VGGT cloud before meshing (#V = points) | B test | 0 | - | - | - | - | - | - | - |
@@ -32,7 +32,7 @@ Grey vs textured (0 of 3 shapes, dev shape excluded; textured minus grey): point
 ## Job status
 
 - step 1: 72 of 72 jobs run (ok 72)
-- step 2: 3 of 16 jobs run (ok 3)
+- step 2: 16 of 16 jobs run (ok 16)
 - step 3: 0 of 16 jobs run (not started)
 - step 4: 0 of 27 jobs run (not started)
 - step 5: 0 of 84 jobs run (not started)
@@ -104,14 +104,14 @@ Not a pipeline result: shows what MeshFlow does with perfect input.
 | shape | CD | HD | NC | F1@0.01 | F1@0.02 | V | F | G | size_ratio | total_s | CD floor |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | pencilpot_299291 (dev, not in means) | 3.19 | 5.1 | 0.955 | 0.820 | 0.991 | 361 | 746 | 0.611 | 1.02 | 51 | 2.79 |
-| cylinder_472094 | - | - | - | - | - | - | - | - | - | - | - |
-| shackbot_94155 | - | - | - | - | - | - | - | - | - | - | - |
-| nsphere_186199 | - | - | - | - | - | - | - | - | - | - | - |
-| wheel_76903 | - | - | - | - | - | - | - | - | - | - | - |
-| presents_98021 | - | - | - | - | - | - | - | - | - | - | - |
-| monsterring_1356640 | - | - | - | - | - | - | - | - | - | - | - |
-| cryptex_105686 | - | - | - | - | - | - | - | - | - | - | - |
-| **mean ± std (min-max), set A, n=0** | - | - | - | - | - | - | - | - | - | - | |
+| cylinder_472094 | 1.55 | 2.3 | 0.970 | 0.975 | 1.000 | 53 | 99 | 0.443 | 1.03 | 51 | 1.27 |
+| shackbot_94155 | 3.04 | 5.4 | 0.971 | 0.899 | 0.995 | 468 | 946 | 0.668 | 1.01 | 50 | 2.80 |
+| nsphere_186199 | 2.49 | 3.4 | 0.930 | 0.867 | 0.994 | 177 | 374 | 0.582 | 1.01 | 50 | 2.06 |
+| wheel_76903 | 2.62 | 4.2 | 0.977 | 0.967 | 1.000 | 166 | 333 | 0.688 | 1.01 | 50 | 2.38 |
+| presents_98021 | 3.60 | 5.3 | 0.908 | 0.627 | 0.890 | 165 | 347 | 0.552 | 1.02 | 50 | 2.85 |
+| monsterring_1356640 | 2.95 | 4.1 | 0.919 | 0.631 | 0.997 | 289 | 584 | 0.594 | 1.01 | 50 | 2.27 |
+| cryptex_105686 | 2.96 | 4.8 | 0.685 | 0.737 | 0.975 | 473 | 2,179 | 0.473 | 1.03 | 50 | 2.15 |
+| **mean ± std (min-max), set A, n=7** | 2.74 ± 0.63 (1.55-3.60) | 4.2 ± 1.1 (2.3-5.4) | 0.908 ± 0.102 (0.685-0.977) | 0.815 ± 0.149 (0.627-0.975) | 0.979 ± 0.040 (0.890-1.000) | 256 ± 162 (53-473) | 695 ± 706 (99-2,179) | 0.571 ± 0.091 (0.443-0.688) | 1.02 ± 0.01 (1.01-1.03) | 50 ± 0 (50-51) | |
 
 ## Step 3: seed variance (MeshFlow seeds 42, 7, 123 on each step-1 cloud)
 
