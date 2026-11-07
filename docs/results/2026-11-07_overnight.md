@@ -1,6 +1,6 @@
 # Overnight results, 2026-11-07
 
-Generated 2026-11-07 02:08 by `scripts/overnight_report.py` from `outputs/` (not in git).
+Generated 2026-11-07 02:23 by `scripts/overnight_report.py` from `outputs/` (not in git).
 
 Protocol v1 (`docs/eval_protocol.md`): camera-only alignment, no ICP; GT in [-0.5, 0.5]; CD/HD x100 at 5k samples
 (MeshFlow definition, not squared); NC and F1 at 100k samples; size = mesh max extent / GT max extent (1 = right size).
@@ -27,14 +27,14 @@ CD floor (what a perfect mesh scores under this protocol): set A 2.26 ± 0.53 (1
 
 Seed spread (set A, 7 shapes with all 3 seeds; average std across seeds vs std across shapes): CD: across seeds 0.30 vs across shapes 3.53; F1@0.02: across seeds 0.022 vs across shapes 0.176; V: across seeds 553 vs across shapes 1,061.
 
-Grey vs textured (0 of 3 shapes, dev shape excluded; textured minus grey): points F1@0.02 -; mesh CD -; mesh F1@0.02 -; VGGT focal ratio grey - vs textured 0.942 ± 0.052 (0.882-0.979).
+Grey vs textured (3 of 3 shapes, dev shape excluded; textured minus grey): points F1@0.02 0.502 ± 0.178 (0.308-0.659); mesh CD -99.29 ± 85.75 (-163.33--1.87); mesh F1@0.02 0.379 ± 0.234 (0.112-0.552); VGGT focal ratio grey 0.861 ± 0.018 (0.849-0.881) vs textured 0.942 ± 0.052 (0.882-0.979).
 
 ## Job status
 
 - step 1: 72 of 72 jobs run (ok 72)
 - step 2: 16 of 16 jobs run (ok 16)
 - step 3: 16 of 16 jobs run (ok 16)
-- step 4: 0 of 27 jobs run (not started)
+- step 4: 27 of 27 jobs run (ok 27)
 - step 5: 0 of 84 jobs run (not started)
 
 No failed or skipped jobs so far.
@@ -137,12 +137,12 @@ Points stage, then MeshFlow mean over seeds 42/7/123. Focal ratio = VGGT's predi
 
 | shape | pts F1@0.02 grey | pts F1@0.02 tex | pts CD grey | pts CD tex | focal ratio grey | focal ratio tex | mesh CD grey | mesh CD tex | mesh F1@0.02 grey | mesh F1@0.02 tex |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| shackbot_94155 | - | 0.394 | - | 13.26 | - | 0.882 | - | 14.78 | - | 0.294 |
-| presents_98021 | - | 0.538 | - | 11.81 | - | 0.979 | - | 12.77 | - | 0.473 |
-| wheel_76903 | - | 0.659 | - | 8.04 | - | 0.964 | - | 9.55 | - | 0.552 |
-| pencilpot_299291 (dev, not in means) | - | 0.478 | - | 8.79 | - | 0.924 | - | 10.02 | - | 0.339 |
+| shackbot_94155 | 0.086 | 0.394 | 18.49 | 13.26 | 0.849 | 0.882 | 16.65 | 14.78 | 0.182 | 0.294 |
+| presents_98021 | 0.000 | 0.538 | 178.25 | 11.81 | 0.853 | 0.979 | 176.10 | 12.77 | 0.000 | 0.473 |
+| wheel_76903 | 0.000 | 0.659 | 145.46 | 8.04 | 0.881 | 0.964 | 142.22 | 9.55 | 0.000 | 0.552 |
+| pencilpot_299291 (dev, not in means) | 0.527 | 0.478 | 9.13 | 8.79 | 1.024 | 0.924 | 10.41 | 10.02 | 0.417 | 0.339 |
 
-Grey vs textured (0 of 3 shapes, dev shape excluded; textured minus grey): points F1@0.02 -; mesh CD -; mesh F1@0.02 -; VGGT focal ratio grey - vs textured 0.942 ± 0.052 (0.882-0.979).
+Grey vs textured (3 of 3 shapes, dev shape excluded; textured minus grey): points F1@0.02 0.502 ± 0.178 (0.308-0.659); mesh CD -99.29 ± 85.75 (-163.33--1.87); mesh F1@0.02 0.379 ± 0.234 (0.112-0.552); VGGT focal ratio grey 0.861 ± 0.018 (0.849-0.881) vs textured 0.942 ± 0.052 (0.882-0.979).
 
 ## Step 5: clean test set, 12 new Thingi10K shapes (textured, 8 views, seed 42)
 
