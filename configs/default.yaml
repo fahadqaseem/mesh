@@ -12,7 +12,7 @@ points:
 mesh:
   mesher: meshflow_cvpr          # meshflow_cvpr | hdpea
   meshflow_cvpr:
-    ckpt_dir: ckpt/meshflow
+    ckpt_dir: ckpt/meshflow/meshflow   # hf download nests config.yaml + model.pth one level down
     steps: 28
     seed: 42
     dtype: fp16                  # forced to fp32 off CUDA

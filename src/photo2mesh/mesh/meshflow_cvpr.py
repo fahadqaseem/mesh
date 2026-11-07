@@ -3,7 +3,7 @@
 Setup (see README):
     git clone https://github.com/facebookresearch/meshflow.git third_party/meshflow
     pip install -e third_party/meshflow   (or add it to PYTHONPATH)
-    download config.yaml + model.pth from huggingface.co/facebook/meshflow into ckpt/meshflow/
+    download config.yaml + model.pth from huggingface.co/facebook/meshflow (hf download --local-dir ckpt/meshflow puts them in ckpt/meshflow/meshflow/)
 
 MeshFlow normalises point-cloud input itself (bounding sphere) and only uses xyz,
 so normals/colours in the .ply are ignored at this stage.
@@ -24,7 +24,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 class MeshFlowCVPR(Mesher):
     name = "meshflow_cvpr"
 
-    def __init__(self, ckpt_dir: str = "ckpt/meshflow", steps: int = 28, seed: int = 42,
+    def __init__(self, ckpt_dir: str = "ckpt/meshflow/meshflow", steps: int = 28, seed: int = 42,
                  dtype: str = "fp16", num_verts: int | None = None, device: str | None = None):
         self.ckpt_dir = str(ckpt_dir)
         self.steps, self.seed, self.num_verts = steps, seed, num_verts
