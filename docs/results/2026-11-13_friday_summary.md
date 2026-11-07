@@ -5,21 +5,22 @@ Fahad Qaseem Khawar. Numbers from the overnight run of 7 Nov (full tables: `docs
 ## Update
 
 **Done this week**
-- The pipeline runs end to end on my MacBook: rendered Thingi10K shapes, VGGT points (8 views), alignment from the render cameras, CVPR MeshFlow mesh. Scored with MeshFlow's protocol (Chamfer x100) plus NC and F1.
-- 12 new held-out shapes: Chamfer 9.6 (a perfect mesh scores 2.4), NC 0.81, F1@0.02 0.44, about 1,440 vertices. The 7 earlier shapes agree: Chamfer 10.3, NC 0.77, F1@0.02 0.47.
+- The pipeline runs end to end on my MacBook: Thingi10K renders, VGGT points (8 views), CVPR MeshFlow, scored with MeshFlow's protocol plus NC and F1.
+- 12 new held-out shapes: Chamfer 9.6 (a perfect mesh scores 2.4), NC 0.81, F1@0.02 0.44, about 1,440 vertices. The 7 earlier shapes agree.
 - Upper bound, MeshFlow on clean GT points: Chamfer 2.9, NC 0.94, F1@0.02 0.98, about 265 vertices.
 
 **What I learned**
-- The mesher is not the bottleneck; VGGT's noisy points are. Noise also makes MeshFlow output 5 to 6 times more vertices.
-- VGGT underestimates the focal length by about 7%, which stretches the cloud sideways. I now use the known focal.
-- Without texture, VGGT's camera poses failed on 2 of 3 shapes (the symmetric ones).
+- Noisy VGGT points make MeshFlow output 5 to 6 times more vertices.
+- VGGT underestimates the focal by about 7%; I now use the known focal.
+- Without texture, VGGT's camera poses fail on symmetric shapes.
 
 **Questions**
-- 16 views does not fit in the Mac's memory. When can I use the lab GPU?
+- The gap is in the points, not the mesher. Should I (a) improve the points (your Gaussian centres idea), or (b) make the mesher robust to noisy points from photos, keeping the contribution on the mesh side?
 - Is the known focal (calibrated cameras) acceptable for our setting?
+- 16 views exceeds the Mac's memory: when can I use the lab GPU?
 
 **Next week**
-- Better points stage (depth quality, outliers), 16 views on the lab GPU, then Gaussian centres vs interpolated points.
+- First tests of both routes (MeshFlow on corrupted clean points; TSDF fusion of VGGT depth), then 16 views on the lab GPU.
 
 ## Headline numbers
 
