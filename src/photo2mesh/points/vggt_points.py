@@ -18,7 +18,9 @@ def run_vggt(image_paths: list[str], use_depth_unprojection: bool = True) -> dic
     Returns a dict of numpy arrays:
         points (S, H, W, 3), conf (S, H, W), colors (S, H, W, 3) in [0, 1], depth (S, H, W),
         extrinsic (S, 3, 4) camera-from-world (OpenCV), intrinsic (S, 3, 3),
-        cam_centres (S, 3) in world coordinates.
+        cam_centres (S, 3) in world coordinates,
+        world_points (S, H, W, 3) and world_points_conf (S, H, W): the point head's own output, always included so
+        one VGGT pass can feed both variants (see use_point_head).
     """
     import torch
     from vggt.models.vggt import VGGT
@@ -56,7 +58,41 @@ def run_vggt(image_paths: list[str], use_depth_unprojection: bool = True) -> dic
     colors = images.permute(0, 2, 3, 1).float().cpu().numpy()
     return {"points": np.asarray(points, np.float32), "conf": np.asarray(conf, np.float32),
             "colors": colors, "extrinsic": extrinsic, "intrinsic": intrinsic,
-            "cam_centres": cam_centres.astype(np.float32), "depth": depth_map.astype(np.float32)}
+            "cam_centres": cam_centres.astype(np.float32), "depth": depth_map.astype(np.float32),
+            "world_points": pred["world_points"][0].float().cpu().numpy().astype(np.float32),
+            "world_points_conf": pred["world_points_conf"][0].float().cpu().numpy().astype(np.float32)}
+
+
+def use_point_head(pred: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
+    """Swap in the point head's world points and confidence (in place), with per-view depth taken from those points.
+
+    The depth maps are the z of each point head point in its own camera, so filters that use depth (silhouette
+    erosion, multi-view consistency) check the point head against itself rather than against the depth head.
+    Cameras stay VGGT's own predictions: a known focal cannot be applied to the point head.
+    """
+    wp = pred["world_points"]
+    ext = pred["extrinsic"]
+    cam = np.einsum("sij,shwj->shwi", ext[:, :, :3], wp) + ext[:, None, None, :, 3]
+    pred["points"], pred["conf"] = wp.astype(np.float32), pred["world_points_conf"].astype(np.float32)
+    pred["depth"] = cam[..., 2].astype(np.float32)
+    return pred
+
+
+def set_known_intrinsics(pred: dict[str, np.ndarray], size: int, yfov_deg: float) -> dict[str, np.ndarray]:
+    """Calibrated setting (in place): replace VGGT's focal by the known one and re-unproject the depth maps.
+
+    For our renders the focal follows from the image size and vertical field of view (as EXIF would give for real
+    photos); the principal point is the image centre.
+    """
+    from vggt.utils.geometry import unproject_depth_map_to_point_map
+
+    k = pred["intrinsic"].copy()
+    f = (size / 2.0) / np.tan(np.deg2rad(yfov_deg) / 2.0)
+    k[:, 0, 0] = k[:, 1, 1] = f
+    k[:, 0, 2] = k[:, 1, 2] = size / 2.0
+    pred["intrinsic"] = k
+    pred["points"] = unproject_depth_map_to_point_map(pred["depth"][..., None], pred["extrinsic"], k).astype(np.float32)
+    return pred
 
 
 def flatten_views(pred: dict[str, np.ndarray]) -> dict[str, np.ndarray]:

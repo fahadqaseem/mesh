@@ -72,6 +72,29 @@ def multiview_consistency(points: np.ndarray, view_of: np.ndarray, depth: np.nda
     return count
 
 
+def filter_pixels(pred: dict[str, np.ndarray], cfg: dict) -> np.ndarray:
+    """Per-pixel keep mask (S*H*W,) of the points stage: confidence, silhouette erosion / depth edges, multi-view check.
+
+    pred holds VGGT maps (points (S, H, W, 3), conf, depth (S, H, W), extrinsic, intrinsic); cfg is the points config.
+    Shared by the point cloud path (scripts/run_points.py) and depth fusion (scripts/tsdf_points.py), so both start
+    from exactly the same pixels.
+    """
+    pts, conf = pred["points"].reshape(-1, 3), pred["conf"].reshape(-1)
+    keep = confidence_mask(conf, percentile=cfg["conf_percentile"], min_conf=cfg["min_conf"])
+    if cfg.get("edge_rel", 0) or cfg.get("fg_erode", 0):
+        fg = (pred["conf"] > cfg["min_conf"])
+        keep &= depth_edge_mask(pred["depth"], rel_thresh=cfg.get("edge_rel", 0) or np.inf, dilate=cfg.get("edge_dilate", 1),
+                                foreground=fg, erode=cfg.get("fg_erode", 0)).reshape(-1)
+    if cfg.get("mv_rel", 0):
+        s_, h_, w_ = pred["depth"].shape
+        view_of = np.repeat(np.arange(s_), h_ * w_)
+        idx = np.flatnonzero(keep)
+        agree = multiview_consistency(pts[idx], view_of[idx], pred["depth"], pred["extrinsic"], pred["intrinsic"],
+                                      pred["conf"] > cfg["min_conf"], rel_thresh=cfg["mv_rel"])
+        keep[idx[agree < cfg.get("mv_min_views", 1)]] = False
+    return keep
+
+
 def remove_statistical_outliers(points: np.ndarray, k: int = 16, std_ratio: float = 2.0) -> np.ndarray:
     """Boolean mask of inliers: mean distance to k neighbours within mean + std_ratio * std."""
     k = min(k + 1, len(points))

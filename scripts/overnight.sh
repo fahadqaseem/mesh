@@ -4,6 +4,8 @@
 # Usage (from the repo root):
 #   .venv/bin/python scripts/make_overnight_queue.py
 #   nohup caffeinate -is scripts/overnight.sh > outputs/overnight/runner.log 2>&1 &
+# Other queues set QUEUE_DIR, REPORT, REPORT_CMD, REPORT_EXTRA (more paths to commit) and COMMIT_PREFIX, e.g. the
+# robustness queue (see scripts/make_robustness_queue.py).
 #
 # Before every job: memory pressure and free disk. If free memory < 30% or free disk < 15 GB, wait 5 minutes and
 # recheck; after 3 failed checks the job is skipped. A failed job is logged and the queue moves on. Jobs already
@@ -12,10 +14,13 @@
 # Logs: outputs/overnight/{runner.log, status.tsv, progress.txt, jobs/<job>.log}
 
 cd "$(dirname "$0")/.." || exit 1
-DIR=outputs/overnight
+DIR=${QUEUE_DIR:-outputs/overnight}
 QUEUE=$DIR/queue.tsv
 STATUS=$DIR/status.tsv
-REPORT=docs/results/2026-11-07_overnight.md
+REPORT=${REPORT:-docs/results/2026-11-07_overnight.md}
+REPORT_CMD=${REPORT_CMD:-scripts/overnight_report.py}
+REPORT_EXTRA=${REPORT_EXTRA:-}
+COMMIT_PREFIX=${COMMIT_PREFIX:-Overnight results}
 MIN_MEM_PCT=30
 MIN_DISK_GB=15
 WAIT_S=300
@@ -52,11 +57,13 @@ run_with_timeout() {   # run "$1" in a new process with a time cap; output to $2
 publish() {   # regenerate the results doc and push it (only that file)
   local step=$1
   log "publish after step $step"
-  .venv/bin/python scripts/overnight_report.py >> "$DIR/report.log" 2>&1 || log "report failed (see report.log)"
-  git add "$REPORT" >> "$DIR/git.log" 2>&1
-  if git commit -m "Overnight results: step $step done ($(date '+%H:%M'))
+  .venv/bin/python "$REPORT_CMD" >> "$DIR/report.log" 2>&1 || log "report failed (see report.log)"
+  # shellcheck disable=SC2086
+  git add "$REPORT" $REPORT_EXTRA >> "$DIR/git.log" 2>&1
+  # shellcheck disable=SC2086
+  if git commit -m "$COMMIT_PREFIX: step $step done ($(date '+%H:%M'))
 
-Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" -- "$REPORT" >> "$DIR/git.log" 2>&1; then
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" -- "$REPORT" $REPORT_EXTRA >> "$DIR/git.log" 2>&1; then
     git push origin main >> "$DIR/git.log" 2>&1 || log "git push failed (see git.log)"
   else
     log "nothing to commit or commit failed (see git.log)"

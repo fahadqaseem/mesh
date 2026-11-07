@@ -22,6 +22,7 @@ git clone https://github.com/facebookresearch/vggt.git third_party/vggt
 pip install -e third_party/vggt
 git clone https://github.com/facebookresearch/meshflow.git third_party/meshflow
 pip install diffusers einops omegaconf   # MeshFlow's own requirements.txt pins CUDA torch 2.8; skip it on the Mac
+pip install -e ".[analysis]"             # Open3D (TSDF fusion, ray casting) + matplotlib; on macOS also: brew install libusb
 # weights are gated: request access at huggingface.co/facebook/meshflow first, then
 hf auth login
 hf download facebook/meshflow --local-dir ckpt/meshflow   # files land in ckpt/meshflow/meshflow/

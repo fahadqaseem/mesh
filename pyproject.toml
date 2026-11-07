@@ -19,6 +19,7 @@ dependencies = [
 [project.optional-dependencies]
 gpu = ["torch", "torchvision", "huggingface_hub"]   # VGGT + MeshFlow
 render = ["pyrender"]
+analysis = ["open3d", "matplotlib"]   # TSDF fusion, ray casting, plots (macOS: Open3D 0.20 also needs brew install libusb)
 dev = ["pytest"]
 
 [tool.setuptools.packages.find]
