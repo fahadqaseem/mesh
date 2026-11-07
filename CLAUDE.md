@@ -60,3 +60,22 @@ multi-view photos
 ## Current task
 
 See `docs/experiments.md` → "Next up". Update it at the end of every session.
+
+## Working rules: git and logging (read every session)
+
+Fahad does strategy in a separate claude.ai chat that reads this folder directly. Keep the files below
+current so that chat always sees the real state without being told.
+
+**Git**
+- Commit after every meaningful step (a fix, a new script, a finished run, a log update). Small commits, clear messages.
+- Push to origin main after each commit (or at least at the end of every work block). Never leave a session with unpushed work.
+- Never commit data/, outputs/, ckpt/, third_party/, .venv/ or any weights (already in .gitignore). Check `git status` before committing.
+- Never force push or rewrite history.
+
+**Logs**
+- docs/experiments.md: one entry per run (template inside), newest on top. Keep "Next up" accurate.
+- docs/status.md: a short snapshot, rewritten (not appended) at the end of every work block:
+  date, what works, what is blocked and why, current numbers, next 3 steps, open questions for Fahad or Prof. Zhong.
+- docs/decisions.md: add a row whenever a direction is chosen (by Fahad, Prof. Zhong, or a result that forces it).
+- If a strategy question comes up that Fahad should decide, write it under "Open questions" in status.md and
+  carry on with the safest option instead of stopping.
