@@ -6,13 +6,14 @@ One entry per run. Newest on top. Claude: append here after every run, and keep 
 0. [ ] Get access to the gated HF weights (huggingface.co/facebook/meshflow), `hf auth login`, download to
        `ckpt/meshflow/`, rerun the MeshFlow smoke test with the real checkpoint.
 1. [x] Set up the env on the Mac (README "Setup"), run `pytest`. (2026-11-06: 8 passed; MeshFlow code runs on CPU + MPS)
-2. [ ] Download a handful of small Thingi10K meshes into `data/gt/` (5 to 10 simple shapes).
-3. [ ] Render 12 views of each with `scripts/render_views.py`.
+2. [x] Download a handful of small Thingi10K meshes into `data/gt/` (8 shapes, see decisions.md).
+3. [x] Render each with `scripts/render_views.py` (v1: Y-up, 2 rings x 8 views, procedural texture).
 4. [ ] Run VGGT on one scene, open `points.ply` in MeshLab, check normals point outward.
 5. [ ] Run CVPR MeshFlow on that `points.ply` (CPU/MPS may be slow; move to lab GPU if so).
 6. [ ] Add alignment (ICP, or use the GT render cameras) so `evaluate.py` scores are meaningful.
 7. [ ] First table: Chamfer / NC / F1 / #verts for 5 shapes. Bring it to Friday's meeting.
 8. [ ] Experiment: Gaussian centres vs interpolated points as MeshFlow input.
+9. [ ] December (with the colour render-back loop, priority 2): add Google Scanned Objects for real textures.
 
 ## Template
 ```
