@@ -1,6 +1,6 @@
 # Status
 
-Snapshot, rewritten at the end of every work block. Last updated: 2026-11-07 01:30.
+Snapshot, rewritten at the end of every work block. Last updated: 2026-11-07 01:50.
 
 ## Running now: overnight queue (started 01:27, expected finish ~03:15, at the latest ~04:00 with memory waits)
 - `nohup caffeinate -is scripts/overnight.sh` (log `outputs/overnight/runner.log`); queue `outputs/overnight/queue.tsv`
@@ -16,6 +16,12 @@ Snapshot, rewritten at the end of every work block. Last updated: 2026-11-07 01:
   4. Grey vs textured: shackbot, presents, wheel (+ pencilpot), 3 seeds each. (~15 min)
   5. 12 more Thingi10K shapes (`configs/step5_shapes.txt`): render, steps 1 and 2. (~36 min)
 - If it stopped: rerun the same command; finished jobs are skipped.
+- Progress at 01:50: step 1 done and published (72/72 jobs ok), step 2 running; no failed or skipped jobs; free memory 78-81%.
+- Reporting (Fahad, 01:45): pencilpot is the dev shape (used for tuning), shown but excluded from all means. Headline
+  means over set A (the other 7 original shapes) and set B (the 12 step-5 shapes, clean test set). The Friday summary
+  (docs/results/2026-11-13_friday_summary.md) is written when the queue finishes.
+- Step 1, set A (7 shapes, seed 42): pipeline mesh CD 10.32 ± 3.73, NC 0.769, F1@0.01 0.298, F1@0.02 0.473, #V 1,682,
+  size 1.05; with VGGT's own focal CD 11.77, F1@0.02 0.406, size 1.10. VGGT focal ratio 0.84-1.01 (mean 0.94).
 
 ## What works
 - Full pipeline on the Mac under the memory rules: render -> VGGT (8 views) -> camera alignment -> MeshFlow -> protocol-v1 scores.
