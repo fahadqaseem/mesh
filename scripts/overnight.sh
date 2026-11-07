@@ -38,7 +38,9 @@ resources_ok() {   # returns 0 when there is enough memory and disk; sets RES_IN
 run_with_timeout() {   # run "$1" in a new process with a time cap; output to $2
   bash -c "$1" < /dev/null > "$2" 2>&1 &
   local pid=$!
-  ( sleep "$JOB_TIMEOUT_S"; kill -TERM "$pid" 2>/dev/null ) &
+  # watchdog: kills the job after JOB_TIMEOUT_S; when stopped it also stops its own sleep (no orphans, no open pipes)
+  ( trap 'kill "$s" 2>/dev/null; exit 0' TERM; sleep "$JOB_TIMEOUT_S" & s=$!; wait "$s"; kill -TERM "$pid" 2>/dev/null ) \
+    < /dev/null > /dev/null 2>&1 &
   local watchdog=$!
   wait "$pid"
   local rc=$?
@@ -50,7 +52,7 @@ run_with_timeout() {   # run "$1" in a new process with a time cap; output to $2
 publish() {   # regenerate the results doc and push it (only that file)
   local step=$1
   log "publish after step $step"
-  ( cd scripts && ../.venv/bin/python overnight_report.py ) >> "$DIR/report.log" 2>&1 || log "report failed (see report.log)"
+  .venv/bin/python scripts/overnight_report.py >> "$DIR/report.log" 2>&1 || log "report failed (see report.log)"
   git add "$REPORT" >> "$DIR/git.log" 2>&1
   if git commit -m "Overnight results: step $step done ($(date '+%H:%M'))
 
