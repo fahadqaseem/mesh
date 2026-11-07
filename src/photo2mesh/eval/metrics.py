@@ -55,3 +55,28 @@ def evaluate_mesh(pred: trimesh.Trimesh, gt: trimesh.Trimesh, n: int = 100_000, 
     out = compare_point_sets(p_pts, p_n, g_pts, g_n, tau=tau)
     out.update({"n_vertices": int(len(pred.vertices)), "n_faces": int(len(pred.faces))})
     return out
+
+
+def evaluate_points(pred_pts: np.ndarray, pred_normals: np.ndarray, gt: trimesh.Trimesh, n: int = 100_000,
+                    tau: float = 0.01, seed: int = 0) -> dict[str, float]:
+    """Compare an (already aligned) oriented point cloud with the GT mesh surface.
+
+    Same metrics as ``evaluate_mesh`` on n points per side (the cloud is randomly subsampled),
+    using the same GT-unit-sphere normalisation. Also reports ``normal_outward``: the fraction of
+    predicted normals that agree in sign with the nearest GT normal (1.0 = all oriented outward).
+    """
+    gt = gt.copy()
+    centre = gt.bounds.mean(axis=0)
+    scale = float(np.linalg.norm(gt.vertices - centre, axis=1).max())
+    gt.apply_translation(-centre)
+    gt.apply_scale(1.0 / scale)
+    rng = np.random.default_rng(seed)
+    idx = rng.choice(len(pred_pts), size=min(n, len(pred_pts)), replace=False)
+    p_pts = ((np.asarray(pred_pts, np.float64)[idx] - centre) / scale).astype(np.float32)
+    p_n = np.asarray(pred_normals, np.float32)[idx]
+    g_pts, g_n = sample_surface(gt, n, seed=seed)
+    out = compare_point_sets(p_pts, p_n, g_pts, g_n, tau=tau)
+    _, i_pg = cKDTree(g_pts).query(p_pts)
+    out["normal_outward"] = float(((p_n * g_n[i_pg]).sum(1) > 0).mean())
+    out["n_points"] = int(len(pred_pts))
+    return out
