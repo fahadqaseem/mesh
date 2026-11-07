@@ -21,8 +21,10 @@ pip install -e ".[gpu,render]"
 git clone https://github.com/facebookresearch/vggt.git third_party/vggt
 pip install -e third_party/vggt
 git clone https://github.com/facebookresearch/meshflow.git third_party/meshflow
-pip install -r third_party/meshflow/requirements.txt   # check their README for exact steps
-huggingface-cli download facebook/meshflow --local-dir ckpt/meshflow
+pip install diffusers einops omegaconf   # MeshFlow's own requirements.txt pins CUDA torch 2.8; skip it on the Mac
+# weights are gated: request access at huggingface.co/facebook/meshflow first, then
+hf auth login
+hf download facebook/meshflow --local-dir ckpt/meshflow
 ```
 
 VGGT weights download automatically the first time (`facebook/VGGT-1B`, about 5 GB).

@@ -39,7 +39,11 @@ class MeshFlowCVPR(Mesher):
             if third_party.exists() and str(third_party) not in sys.path:
                 sys.path.insert(0, str(third_party))
             from meshflow.pipelines import MeshFlowPipeline
+            # MeshFlow's from_pretrained silently falls back to CPU whenever CUDA is absent
+            # (so "mps" would be ignored). Load there, then move to the device we picked.
             self._pipeline = MeshFlowPipeline.from_pretrained(self.ckpt_dir, device=self.device, dtype=self.dtype)
+            if self._pipeline.device.type != self.device:
+                self._pipeline.to(self.device)
         return self._pipeline
 
     def run(self, points_ply: str | Path, out_path: str | Path, **kwargs) -> trimesh.Trimesh:
