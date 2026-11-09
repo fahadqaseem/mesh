@@ -3,15 +3,13 @@
 One entry per run. Newest on top. Claude: append here after every run, and keep "Next up" current.
 
 ## Next up
-1. [ ] TSDF fusion as the default points stage (config + run_pipeline), after Fahad's OK (status.md Open questions).
-       Then retune on pencilpot only: min views, truncation; check Hausdorff (still 22 vs 4 upper bound).
-2. [ ] Gaussian centres vs interpolated points (decision 5): fits the Mac with msplat (pip wheel, Metal); write VGGT
-       cameras + points as a COLMAP/nerfstudio scene first.
-3. [ ] Unseen surface (24% of the gap, rig never sees the underside): views from below, or mesher-side completion
-       (route b) depending on Prof. Zhong's answer.
-4. [ ] Lab GPU: VGGT with 16 views (8 vs 16; note 16 views adds only 0-6% visible surface on these rings).
+1. [ ] Unseen surface (24% of the gap: the rig never sees the underside): add views from below, or mesher-side
+       completion (route b), depending on Prof. Zhong's answer.
+2. [ ] Lab GPU: VGGT with 16 views (8 vs 16; the same two rings add only 0-6% visible surface).
+3. [ ] Retune TSDF on pencilpot only if needed (Hausdorff still 22 vs 4 upper bound; size 1.08).
+4. [ ] Gaussians beyond centres: opacity/scale/colour for the render-back loop (priority 2), not as a point source.
 5. [ ] Guidance 2.5 vs 1.0 numerical check (own process).
-6. [ ] December (with the colour render-back loop, priority 2): add Google Scanned Objects for real textures.
+6. [ ] December (with the colour render-back loop): add Google Scanned Objects for real textures.
 
 Done: env + pytest (11-06); MeshFlow weights downloaded (11-07); 8 Thingi10K shapes rendered v1 (Y-up, 2 rings x 8,
 procedural texture); VGGT on all 8 scenes (16 views); alignment stage (camera Umeyama + ICP); point-cloud evaluation;
@@ -19,7 +17,8 @@ MeshFlow CPU vs MPS timing (11-07); input ablation on pencilpot (11-07); point c
 eval protocol v1 (11-07); Part A: 8 views + known focal + multi-view filter (11-07); hybrid MeshFlow (11-07);
 overnight tooling (11-07); overnight run, 215 jobs, steps 1-5 (11-07);
 Friday summary docs/results/2026-11-13_friday_summary.md (11-07); robustness run, Experiments A and B, 600 jobs (11-07);
-point head vs depth unprojection (11-07); size bias explained by noise (11-07).
+point head vs depth unprojection (11-07); size bias explained by noise (11-07);
+TSDF fusion made the default points stage, v3 headline rerun (11-09); Gaussian centres with msplat (11-09).
 
 ## Template
 ```
@@ -33,6 +32,32 @@ Next:
 ```
 
 ## Runs
+
+### 2026-11-09  v3_headline + gaussians_v1  (points stage v3 = TSDF default; Gaussian centres; protocol v1)
+Goal: (1) make TSDF fusion the default points stage (Fahad's decision) and rerun the headline, keeping the v2 filtered
+  points as the comparison row; (2) decision 5: Gaussian centres vs TSDF points vs filtered points as MeshFlow input.
+Command: `python scripts/make_v3_queue.py headline` (00:26 to 01:16, 135/135 ok) and `... gaussians` (01:21 to 01:45,
+  114/114 ok), both with scripts/overnight.sh. Report: docs/results/2026-11-09_v3_gaussians.md (scripts/v3_report.py).
+Input: dev pencilpot + set A (MeshFlow seeds 42/7/123) + set B (seed 42); Gaussians on set A and set B (seed 42).
+Config: points.fusion: tsdf (voxel 0.5% of size, truncation 6 voxels, min 1 view, no multi-view filter). Gaussians:
+  scripts/gaussian_points.py: VGGT cameras (known focal) + 100k points of the v3 cloud -> binary COLMAP -> msplat
+  1.1.4 (Metal), 7,000 iterations, white background, keep_crs -> centres with opacity >= 0.5 and largest axis <= 5% of
+  the object. Init size chosen on pencilpot by mesh F1 (20k init: CD 7.89 / F1 0.40; 100k: 6.91 / 0.60).
+Result (mean ± std over shapes):
+  v3 headline set B: CD 6.24 ± 1.87, HD 22.7, NC 0.819, F1@0.01 0.335, F1@0.02 0.598, #V 933, size 1.09 (12/12 better
+    than v2: 9.58 / 0.436 / 1,440); set A: CD 5.98, F1@0.02 0.688; set A 3-seed mean CD 5.83 (v2 10.23). Dev pencilpot 7.12.
+  Gaussian centres set B: CD 6.44 ± 1.73, NC 0.736, F1@0.02 0.581, #V 2,920, size 1.16 (vs TSDF: CD better on 4/12,
+    F1 on 6/12); set A: CD 6.34, NC 0.706, F1@0.02 0.586, #V 3,116 (vs TSDF better on 1/7). Points: ~12k centres,
+    σ 1.7-1.9% of L, bias -0.4 to -0.6% (inside the surface). msplat: 10 ± 1 s per object, 26k Gaussians, peak 0.6 GB.
+Notes / what I saw:
+  - Every v3 cloud was byte-identical to the 7 Nov TSDF run (cmp per shape): the default is reproducible.
+  - msplat densifies little on 8 views at 518 px (20k init -> 16k Gaussians); training is not bit-reproducible
+    (16.0k vs 16.2k Gaussians with the same settings).
+  - Gaussian centres keep coverage like TSDF, but are noisier and offset inwards; per the robustness run, noise is
+    what drives MeshFlow's vertex count and size, which matches the 3x vertices.
+Takeaway: TSDF stays the default (set B Chamfer 6.24, F1@0.02 0.60); Gaussian centres match it on Chamfer but give
+  worse normals and 3x the vertices. Both beat the old filtered points by about a third in Chamfer.
+Next: unseen surface (views from below vs mesher completion), 16 views on the lab GPU.
 
 ### 2026-11-07  robustness_v1  (Experiments A and B; 600 jobs, 136 MeshFlow runs; protocol v1, seed 42)
 Goal: (A) which corruption explains the points-to-mesh gap: MeshFlow on clean GT samples corrupted on purpose, plus

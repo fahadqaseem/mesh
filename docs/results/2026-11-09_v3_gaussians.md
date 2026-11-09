@@ -112,4 +112,32 @@ Training (msplat, 7000 iterations, M4 Pro): 10 ± 1 s per object, 26,063 Gaussia
 <!-- manual -->
 ## Interpretation
 
-(written when the queues have finished)
+Queues: headline 135/135 jobs ok (00:26 to 01:16), Gaussians 114/114 ok (01:21 to 01:45). Every v3 cloud was
+byte-identical to the 7 Nov TSDF run (`cmp` per shape), so the v3 headline equals the robustness numbers.
+
+**1. New headline (TSDF fusion, the default since 9 Nov).** Set B (clean test set): Chamfer 6.24 ± 1.87, NC 0.819,
+F1@0.02 0.598, 933 vertices (v2 filtered points: 9.58, 0.806, 0.436, 1,440); better on 12 of 12 shapes. Set A: 5.98
+(3-seed mean 5.83) vs 10.32 (10.23). The size bias is unchanged (1.08 to 1.09): it comes from noise via MeshFlow
+(robustness report), not from coverage.
+
+**2. Gaussian centres vs TSDF points vs filtered points.**
+- Gaussian centres are much better than the old filtered points (set B Chamfer 6.44 vs 9.58, better on 11 of 12)
+  because, like TSDF, they keep coverage (raw coverage within 5% of L: 0.83 to 0.87 on pencilpot).
+- Against TSDF points they are not better: set B Chamfer 6.44 vs 6.24 (better on 4 of 12), F1@0.02 0.581 vs 0.598
+  (6 of 12); set A 6.34 vs 5.98 (1 of 7). The Chamfer difference is within the shape-to-shape spread.
+- They are clearly worse on surface quality: NC 0.736 vs 0.819, about 3 times the vertices (2,920 vs 933) and larger
+  meshes (size 1.16 vs 1.09). Gaussian centres sit about 0.5% of L inside the surface (bias -0.64% vs +0.69%), are
+  noisier (σ 1.7% vs 1.2%) and sparser (about 12k centres; the coverage statistic at 1% under-counts sparse clouds).
+  Noise, not coverage, drives vertices and size (robustness report), which fits.
+- Practical: msplat trains one object in about 10 s with 0.6 GB on the M4 Pro (8 views at 518 px, 7,000 iterations).
+  Training is not bit-reproducible; settings (100k initial points from the v3 cloud, opacity >= 0.5) were chosen on
+  pencilpot only, by mesh F1.
+
+**Decision suggested by the data:** keep TSDF fusion as the points stage. Gaussian centres are a viable alternative
+input (same Chamfer, no GPU needed) but give MeshFlow noisier points, hence lower NC and 3 times the vertices. If
+Gaussians are used later, it should be for what they add beyond centres (opacity, scale, colour for the render-back
+loop), not as a replacement point source.
+
+**Caveats.** One MeshFlow seed (42) for the Gaussian comparison; 3DGS from 8 sparse views; the Gaussians start from
+the TSDF cloud, so they are not independent of it (an SfM-only start would need COLMAP features; the 20k-point start
+gave a worse mesh on pencilpot: Chamfer 7.89, F1@0.02 0.40).
