@@ -1,4 +1,7 @@
-"""Stage 1: photos -> filtered, oriented point cloud (.ply with xyz, normals, rgb).
+"""Stage 1: photos -> oriented point cloud (.ply with xyz, normals, rgb).
+
+Default (points.fusion: tsdf): fuse the 8 VGGT depth maps in a TSDF and sample the fused surface.
+--set fusion=points gives the v2 stage (filtered per-view points, multi-view check).
 
 Usage:
     python scripts/run_points.py --images data/scenes/bunny/images --run bunny_v1
@@ -15,6 +18,7 @@ import yaml
 
 from photo2mesh.io import save_points_ply
 from photo2mesh.points.filter import filter_pixels, remove_statistical_outliers, voxel_downsample
+from photo2mesh.points.fusion import tsdf_points
 from photo2mesh.points.normals import estimate_normals
 from photo2mesh.points.vggt_points import (flatten_views, list_images, run_vggt, set_known_intrinsics,
                                            use_point_head)
@@ -76,6 +80,15 @@ def main() -> None:
         set_known_intrinsics(pred, meta["size"], meta["yfov_deg"])
     np.savez(out_dir / "cameras.npz", extrinsic=pred["extrinsic"], intrinsic=pred["intrinsic"],
              cam_centres=pred["cam_centres"], view_ids=np.array(view_ids), intrinsic_pred=intrinsic_pred)
+    if cfg.get("fusion", "points") == "tsdf":
+        # points stage v3 (default since 2026-11-09): fuse the depth maps, sample the fused surface
+        pts, normals, cols, mesh, info = tsdf_points(pred, cfg, cfg.get("tsdf"), n=cfg.get("max_points") or 200_000)
+        save_points_ply(out_dir / "points.ply", pts, normals=normals, colors=cols)
+        mesh.export(out_dir / "tsdf_mesh.ply")
+        (out_dir / "tsdf.json").write_text(json.dumps(info, indent=2))
+        print(f"[points] TSDF: {info['pixels_fused']:,} pixels -> {info['faces']:,} faces -> {len(pts):,} points "
+              f"-> {out_dir / 'points.ply'}")
+        return
     flat = flatten_views(pred)
     pts, cols, views = flat["points"], flat["colors"], flat["viewpoints"]
 

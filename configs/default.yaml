@@ -1,11 +1,18 @@
 # Default settings. Copy to configs/<experiment>.yaml to change things per experiment.
 
 points:
+  fusion: tsdf                   # tsdf (v3, default since 2026-11-09) | points (v2: concatenate filtered per-view points)
+  tsdf:                          # used when fusion = tsdf (settings chosen on pencilpot only)
+    mv_rel: 0.0                  # multi-view filter before fusion: off (the fusion averages the views)
+    voxel_frac: 0.005            # voxel = 0.5% of the object size
+    trunc_vox: 6                 # truncation = 6 voxels
+    min_views: 1                 # surface wherever at least one view saw it
+    min_part: 0.01               # drop fused pieces under 1% of the area
   view_ids: [0, 2, 4, 6, 9, 11, 13, 15]   # 8 views, 4 per ring (Mac memory rule); "all" for every image
   edge_rel: 0.0                  # depth-edge filter: drop pixels whose depth jumps > edge_rel * depth vs a neighbour (0 = off)
   edge_dilate: 1                 # widen detected edges by this many pixels
   fg_erode: 2                    # erode the foreground (conf > min_conf) mask by this many pixels
-  mv_rel: 0.01                   # multi-view consistency: depth agreement tolerance (relative); 0 = off
+  mv_rel: 0.01                   # (fusion = points only) multi-view consistency: depth agreement tolerance (relative); 0 = off
   mv_min_views: 2                # keep points that at least this many other views agree with
   intrinsics: known              # predicted (VGGT's own focal) | known (render focal from gt_transform.json)
   use_depth_unprojection: true   # VGGT authors: depth + cameras is more accurate than the point head

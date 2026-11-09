@@ -78,3 +78,36 @@ def drop_small_parts(mesh: trimesh.Trimesh, min_frac: float) -> trimesh.Trimesh:
     total = sum(p.area for p in parts)
     keep = [p for p in parts if p.area >= min_frac * total]
     return trimesh.util.concatenate(keep)
+
+
+TSDF_DEFAULTS = {"mv_rel": 0.0, "voxel_frac": 0.005, "trunc_vox": 6.0, "min_views": 1, "min_part": 0.01}
+
+
+def tsdf_points(pred: dict, cfg: dict, tsdf_cfg: dict | None = None, n: int = 200_000):
+    """Points stage v3: fuse the filtered depth maps in a TSDF and sample n points from the fused surface.
+
+    pred: VGGT maps (intrinsics already final, e.g. known focal); cfg: points config (pixel filters);
+    tsdf_cfg: overrides of TSDF_DEFAULTS. Its mv_rel replaces the points config's multi-view filter (0 = off: the
+    fusion averages the views instead). Returns (points, normals, colours, fused mesh, info dict).
+    """
+    from .filter import filter_pixels
+
+    t = {**TSDF_DEFAULTS, **(tsdf_cfg or {})}
+    keep = filter_pixels(pred, {**cfg, "mv_rel": t["mv_rel"]}).reshape(pred["depth"].shape)
+    kept = pred["points"][keep]
+    size = float((np.percentile(kept, 99, axis=0) - np.percentile(kept, 1, axis=0)).max())
+    voxel = t["voxel_frac"] * size
+    mesh = fuse(np.where(keep, pred["depth"], 0.0), pred["colors"], pred["extrinsic"], pred["intrinsic"], voxel,
+                t["trunc_vox"], t["min_views"])
+    if len(mesh.faces) == 0:
+        raise RuntimeError("TSDF: empty surface (lower min_views or raise trunc_vox)")
+    n_faces_raw = len(mesh.faces)
+    mesh = drop_small_parts(mesh, t["min_part"])
+    pts, nrm, cols = sample_with_colours(mesh, n, seed=0)
+    # the fused surface faces the cameras; flip the few normals that point away from every camera
+    to_cam = pred["cam_centres"][None] - pts[:, None]
+    away = (np.einsum("nsj,nj->ns", to_cam, nrm) < 0).all(axis=1)
+    nrm[away] *= -1
+    info = {**t, "pixels_fused": int(keep.sum()), "object_size": size, "voxel": voxel, "trunc": t["trunc_vox"] * voxel,
+            "faces_raw": n_faces_raw, "faces": int(len(mesh.faces)), "n": int(len(pts))}
+    return pts, nrm, cols, mesh, info
