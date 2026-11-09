@@ -2,9 +2,9 @@
 
 Usage:
     python scripts/gaussian_points.py --images data/scenes/<s>/images_tex --from <s>_tex_v3 --run <s>_gs \
-        [--iters 7000] [--init-n 20000] [--min-opacity 0.5] [--max-scale 0.05]
+        [--iters 7000] [--init-n 100000] [--min-opacity 0.5] [--max-scale 0.05]
 Reads outputs/<from>/points/{cameras.npz, points.ply}: VGGT's cameras (known focal) and the v3 (TSDF) cloud, which is
-subsampled to an SfM-like initial cloud. Trains in VGGT's frame (keep_crs, white background like the renders).
+subsampled to the initial cloud. Trains in VGGT's frame (keep_crs, white background like the renders).
 Writes outputs/<run>/colmap/ (images + sparse/0/*.bin), outputs/<run>/gaussians/splat.ply and
 outputs/<run>/points/{points.ply, cameras.npz, gaussians.json}; align.py, points_eval.py and mesh_eval.py run unchanged.
 One heavy job: one object per process (Mac memory rules).
@@ -33,9 +33,10 @@ def main() -> None:
     ap.add_argument("--from", dest="src", required=True)
     ap.add_argument("--run", required=True)
     ap.add_argument("--iters", type=int, default=7000)
-    ap.add_argument("--init-n", type=int, default=20_000, help="initial points (SfM-like sparse cloud)")
+    ap.add_argument("--init-n", type=int, default=100_000, help="initial points from the v3 cloud (chosen on pencilpot)")
     ap.add_argument("--min-opacity", type=float, default=0.5)
     ap.add_argument("--max-scale", type=float, default=0.05, help="drop Gaussians larger than this fraction of the object")
+    ap.add_argument("--densify-grad", type=float, default=0.0002, help="msplat densification gradient threshold")
     ap.add_argument("--n", type=int, default=200_000, help="cap on output points")
     args = ap.parse_args()
 
@@ -64,7 +65,8 @@ def main() -> None:
     # 2. train 3DGS on the Metal GPU
     (run / "gaussians").mkdir(parents=True, exist_ok=True)
     splat = run / "gaussians" / "splat.ply"
-    cfg = msplat.TrainingConfig(iterations=args.iters, keep_crs=True, bg_color=[1.0, 1.0, 1.0], output=str(splat))
+    cfg = msplat.TrainingConfig(iterations=args.iters, keep_crs=True, bg_color=[1.0, 1.0, 1.0], output=str(splat),
+                                 densify_grad_thresh=args.densify_grad)
     t0 = time.time()
     trainer = msplat.GaussianTrainer(msplat.load_dataset(str(col)), cfg)
     trainer.train(lambda *a, **k: None, 1000)
@@ -88,7 +90,7 @@ def main() -> None:
     save_points_ply(out / "points.ply", pts, normals=nrm)
     shutil.copy(src / "cameras.npz", out / "cameras.npz")
     peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1e9
-    info = {"from": args.src, "iters": args.iters, "init_n": int(len(idx)), "train_s": train_s, "gaussians": n_gauss,
+    info = {"from": args.src, "iters": args.iters, "densify_grad": args.densify_grad, "init_n": int(len(idx)), "train_s": train_s, "gaussians": n_gauss,
             "kept": int(len(pts)), "min_opacity": args.min_opacity, "max_scale": args.max_scale, "object_size": size,
             "peak_rss_gb": peak}
     (out / "gaussians.json").write_text(json.dumps(info, indent=2))

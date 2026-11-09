@@ -122,9 +122,9 @@ def main() -> None:
         pcols = [("CD", "points Chamfer", 2), ("F1@0.02", "points F1@0.02", 3)]
         lines += ["## 2. Gaussian centres vs TSDF points vs filtered points (MeshFlow input)", "",
                   "Gaussian centres: 3D Gaussian splatting trained on the 8 views with msplat (Metal, on the Mac), in VGGT's "
-                  "frame with VGGT's cameras (known focal), initialised from 20k points of the v3 cloud, white background; "
+                  "frame with VGGT's cameras (known focal), initialised from 100k points of the v3 cloud, white background, 7,000 iterations; "
                   "the centres of Gaussians with opacity >= 0.5 and largest axis <= 5% of the object are the points "
-                  "(settings chosen on pencilpot only). All three inputs come from the same VGGT pass. MeshFlow seed 42.", ""]
+                  "(settings chosen on pencilpot only; msplat training is not bit-reproducible: the same settings gave 16.0k and 16.2k Gaussians). All three inputs come from the same VGGT pass. MeshFlow seed 42.", ""]
         for name, shapes in [("Set B (12 shapes, clean test set)", SET_B), ("Set A (7 shapes)", SET_A)]:
             n = len(shapes)
             lines += [f"**{name}: points**", "", header(["input"], STAT_COLS + pcols)]
