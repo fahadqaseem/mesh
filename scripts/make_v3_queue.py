@@ -7,7 +7,9 @@ REPORT_CMD=scripts/v3_report.py REPORT_EXTRA=docs/results/figures COMMIT_PREFIX=
 headline (2026-11-09, Fahad: TSDF fusion becomes the default points stage):
   1. dev + set A: VGGT (8 views) -> TSDF (default config) -> align -> points eval -> stats -> MeshFlow seeds 42/7/123
   2. set B: the same with seed 42
-gaussians: see make_gaussian_jobs (added when the msplat stage exists).
+gaussians (Fahad: Gaussian centres vs TSDF points vs filtered points as MeshFlow input):
+  1. set A: 3DGS with msplat from <s>_tex_v3 (one object per process) -> align -> points eval -> stats -> MeshFlow 42
+  2. set B: the same
 """
 from __future__ import annotations
 
@@ -37,6 +39,17 @@ def headline(step: int, s: str, seeds: list[int]) -> list[tuple]:
     return [j for j in jobs if j] + [mesh(step, run, s, seed) for seed in seeds]
 
 
+def gaussians(step: int, s: str) -> list[tuple]:
+    run = f"{s}_gs"
+    return [(step, f"{run}/train", f"{PY} scripts/gaussian_points.py --images data/scenes/{s}/images_tex "
+                                  f"--from {s}_tex_v3 --run {run}"),
+            (step, f"{run}/align", f"{PY} scripts/align.py --run {run} --scene data/scenes/{s}"),
+            (step, f"{run}/points_eval", f"{PY} scripts/points_eval.py --run {run} --scene data/scenes/{s}"),
+            (step, f"{run}/stats", f"{PY} scripts/cloud_stats.py --run-dir outputs/{run} --scene data/scenes/{s}"),
+            mesh(step, run, s, 42),
+            (step, f"{run}/rm_images", f"rm -rf outputs/{run}/colmap/images")]
+
+
 def main() -> None:
     name = sys.argv[1] if len(sys.argv) > 1 else "headline"
     jobs: list[tuple] = []
@@ -46,8 +59,9 @@ def main() -> None:
         for s in SET_B:
             jobs += headline(2, s, [42])
     else:
-        from make_gaussian_jobs import gaussian_jobs   # noqa: E402  (scripts/ is on sys.path when run as a script)
-        jobs = gaussian_jobs()
+        for step, shapes in [(1, SET_A), (2, SET_B)]:
+            for s in shapes:
+                jobs += gaussians(step, s)
     out = Path(f"outputs/v3_queue_{name}")
     out.mkdir(parents=True, exist_ok=True)
     (out / "queue.tsv").write_text("".join(f"{st}\t{jid}\t{cmd}\n" for st, jid, cmd in jobs))
