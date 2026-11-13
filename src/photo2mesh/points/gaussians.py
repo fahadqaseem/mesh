@@ -108,3 +108,55 @@ def gaussian_centres(v: np.ndarray, min_opacity: float = 0.5, max_scale: float |
     if max_scale is not None:
         keep &= scale <= max_scale
     return xyz[keep], opacity[keep], scale[keep]
+
+
+def kernel_frames(v: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Per-Gaussian rotation matrices (N, 3, 3) (columns = local axes) and scales (N, 3) from a 3DGS vertex array.
+
+    Quaternions (rot_0..rot_3 = w, x, y, z) are stored unnormalised; scales as logs.
+    """
+    q = np.stack([v[f"rot_{i}"] for i in range(4)], 1).astype(np.float64)
+    q /= np.linalg.norm(q, axis=1, keepdims=True)
+    w, x, y, z = q.T
+    r = np.stack([np.stack([1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y)], -1),
+                  np.stack([2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x)], -1),
+                  np.stack([2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)], -1)], 1)
+    s = np.exp(np.stack([v[f"scale_{i}"] for i in range(3)], 1).astype(np.float64))
+    return r, s
+
+
+def sample_kernels(v: np.ndarray, n: int, min_opacity: float = 0.5, max_scale: float | None = None,
+                   weight: str = "opacity", trunc: float = 2.0, seed: int = 0):
+    """Sample n points from the Gaussians' own densities instead of taking their centres.
+
+    Gaussians are filtered as in gaussian_centres. Each point picks a Gaussian with probability proportional to its
+    opacity ("opacity") or opacity times its footprint area s_1 * s_2 of the two largest axes ("opacity_area", so
+    that big flat splats get proportionally more points), then x = mu + R diag(s) z with z ~ N(0, I) truncated to
+    |z_i| <= trunc (resampled). Normal = the Gaussian's shortest axis (unoriented).
+    Returns (points (n, 3), normals (n, 3), index of the source Gaussian (n,)).
+    """
+    xyz = np.stack([v["x"], v["y"], v["z"]], 1).astype(np.float64)
+    opacity = 1.0 / (1.0 + np.exp(-v["opacity"].astype(np.float64)))
+    r, s = kernel_frames(v)
+    keep = opacity >= min_opacity
+    if max_scale is not None:
+        keep &= s.max(1) <= max_scale
+    idx = np.flatnonzero(keep)
+    if len(idx) == 0:
+        raise ValueError("no Gaussian passes the opacity / scale filter")
+    w = opacity[idx]
+    if weight == "opacity_area":
+        ss = np.sort(s[idx], 1)
+        w = w * ss[:, 1] * ss[:, 2]
+    elif weight != "opacity":
+        raise ValueError(f"unknown weight {weight!r}")
+    rng = np.random.default_rng(seed)
+    pick = idx[rng.choice(len(idx), size=n, p=w / w.sum())]
+    z = rng.standard_normal((n, 3))
+    bad = np.abs(z) > trunc
+    while bad.any():
+        z[bad] = rng.standard_normal(int(bad.sum()))
+        bad = np.abs(z) > trunc
+    pts = xyz[pick] + np.einsum("nij,nj->ni", r[pick], s[pick] * z)
+    nrm = r[pick, :, :][np.arange(n), :, np.argmin(s[pick], 1)]
+    return pts, nrm, pick

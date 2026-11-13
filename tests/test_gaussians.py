@@ -1,7 +1,7 @@
 import numpy as np
 
 from photo2mesh.points.gaussians import (gaussian_centres, qvec_to_rotmat, read_colmap_images, read_ply_vertices,
-                                         rotmat_to_qvec, write_colmap)
+                                         rotmat_to_qvec, sample_kernels, write_colmap)
 
 
 def _random_rotation(rng):
@@ -46,3 +46,20 @@ def test_gaussian_ply_and_opacity_filter(tmp_path):
     assert np.allclose(xyz[:, 0], [0, 2])
     xyz, _, _ = gaussian_centres(back, min_opacity=0.5, max_scale=0.1)
     assert np.allclose(xyz[:, 0], [0])
+
+
+def test_kernel_sampling_follows_covariance():
+    fields = [(n, "<f4") for n in ["x", "y", "z", "opacity", "scale_0", "scale_1", "scale_2",
+                                   "rot_0", "rot_1", "rot_2", "rot_3"]]
+    v = np.zeros(2, dtype=fields)
+    v["x"] = [0.0, 10.0]
+    v["opacity"] = [5.0, -5.0]                              # second Gaussian is filtered out
+    v["scale_0"], v["scale_1"], v["scale_2"] = np.log(0.1), np.log(0.01), np.log(0.001)
+    c, s = np.cos(np.pi / 4), np.sin(np.pi / 4)             # 90 deg about z, stored unnormalised (x2)
+    v["rot_0"], v["rot_3"] = 2 * c, 2 * s
+    pts, nrm, pick = sample_kernels(v, 20000, min_opacity=0.5, trunc=2.0)
+    assert (pick == 0).all()
+    sd = pts.std(0)
+    assert np.isclose(sd[1], 0.1 * 0.88, rtol=0.05) and np.isclose(sd[0], 0.01 * 0.88, rtol=0.05)  # truncated N: 0.88
+    assert np.abs(pts).max(0)[1] <= 0.2 + 1e-9
+    assert np.allclose(np.abs(nrm[:, 2]), 1)                # shortest axis = z

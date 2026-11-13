@@ -5,6 +5,8 @@ sample points from it. Used by scripts/tsdf_points.py.
 """
 from __future__ import annotations
 
+import time
+
 import numpy as np
 import trimesh
 
@@ -72,12 +74,15 @@ def sample_with_colours(mesh: trimesh.Trimesh, n: int, seed: int = 0) -> tuple[n
 
 def drop_small_parts(mesh: trimesh.Trimesh, min_frac: float) -> trimesh.Trimesh:
     """Remove connected pieces with less than min_frac of the total area (fused floaters)."""
-    parts = mesh.split(only_watertight=False)
-    if len(parts) <= 1:
+    # same result as mesh.split() + area filter + concatenate, but only the kept pieces become meshes: fine voxels
+    # leave thousands of tiny floaters, and building (and hashing) a Trimesh for each one took minutes
+    comps = trimesh.graph.connected_components(edges=mesh.face_adjacency, nodes=np.arange(len(mesh.faces)), min_len=1)
+    if len(comps) <= 1:
         return mesh
-    total = sum(p.area for p in parts)
-    keep = [p for p in parts if p.area >= min_frac * total]
-    return trimesh.util.concatenate(keep)
+    area = mesh.area_faces
+    areas = np.array([area[c].sum() for c in comps])
+    keep = [c for c, a in zip(comps, areas) if a >= min_frac * areas.sum()]
+    return trimesh.util.concatenate(mesh.submesh(keep, only_watertight=False, repair=True, append=False))
 
 
 TSDF_DEFAULTS = {"mv_rel": 0.0, "voxel_frac": 0.005, "trunc_vox": 6.0, "min_views": 1, "min_part": 0.01}
@@ -97,17 +102,22 @@ def tsdf_points(pred: dict, cfg: dict, tsdf_cfg: dict | None = None, n: int = 20
     kept = pred["points"][keep]
     size = float((np.percentile(kept, 99, axis=0) - np.percentile(kept, 1, axis=0)).max())
     voxel = t["voxel_frac"] * size
+    t0 = time.time()
     mesh = fuse(np.where(keep, pred["depth"], 0.0), pred["colors"], pred["extrinsic"], pred["intrinsic"], voxel,
                 t["trunc_vox"], t["min_views"])
     if len(mesh.faces) == 0:
         raise RuntimeError("TSDF: empty surface (lower min_views or raise trunc_vox)")
     n_faces_raw = len(mesh.faces)
     mesh = drop_small_parts(mesh, t["min_part"])
+    fuse_s = time.time() - t0
+    t0 = time.time()
     pts, nrm, cols = sample_with_colours(mesh, n, seed=0)
     # the fused surface faces the cameras; flip the few normals that point away from every camera
     to_cam = pred["cam_centres"][None] - pts[:, None]
     away = (np.einsum("nsj,nj->ns", to_cam, nrm) < 0).all(axis=1)
     nrm[away] *= -1
+    sample_s = time.time() - t0
     info = {**t, "pixels_fused": int(keep.sum()), "object_size": size, "voxel": voxel, "trunc": t["trunc_vox"] * voxel,
-            "faces_raw": n_faces_raw, "faces": int(len(mesh.faces)), "n": int(len(pts))}
+            "faces_raw": n_faces_raw, "faces": int(len(mesh.faces)), "n": int(len(pts)),
+            "fuse_s": fuse_s, "sample_s": sample_s}
     return pts, nrm, cols, mesh, info

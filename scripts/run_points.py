@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import resource
+import time
 from pathlib import Path
 
 import numpy as np
@@ -61,7 +63,9 @@ def main() -> None:
         pred = dict(np.load(raw_path))
         view_ids = [int(i) for i in pred.pop("view_ids", view_ids)]
     else:
+        t_vggt = time.time()
         pred = run_vggt([images[i] for i in view_ids], use_depth_unprojection=cfg["use_depth_unprojection"])
+        vggt_s = time.time() - t_vggt
         pred["view_ids"] = np.array(view_ids)
         if args.keep_raw:
             raw_dir.mkdir(parents=True, exist_ok=True)
@@ -83,6 +87,8 @@ def main() -> None:
     if cfg.get("fusion", "points") == "tsdf":
         # points stage v3 (default since 2026-11-09): fuse the depth maps, sample the fused surface
         pts, normals, cols, mesh, info = tsdf_points(pred, cfg, cfg.get("tsdf"), n=cfg.get("max_points") or 200_000)
+        info["vggt_s"] = None if args.reuse_raw else vggt_s
+        info["peak_rss_gb"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1e9
         save_points_ply(out_dir / "points.ply", pts, normals=normals, colors=cols)
         mesh.export(out_dir / "tsdf_mesh.ply")
         (out_dir / "tsdf.json").write_text(json.dumps(info, indent=2))

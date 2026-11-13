@@ -15,6 +15,7 @@ from .metrics import sample_surface
 N_CD = 5_000          # samples per surface for CD / HD (MeshFlow evaluate.py default)
 N_DENSE = 100_000     # samples per surface for NC / F1
 TAUS = (0.01, 0.02)
+TAUS_POINTS = (0.005, 0.01, 0.02)   # point clouds: also 0.5% of the object (finer than the TSDF voxel), added 2026-11-12
 
 
 def unit_cube_transform(gt: trimesh.Trimesh) -> tuple[np.ndarray, float]:
@@ -30,14 +31,14 @@ def chamfer_hausdorff(a: np.ndarray, b: np.ndarray) -> tuple[float, float]:
     return float(d_ab.mean() + d_ba.mean()), float(max(d_ab.max(), d_ba.max()))
 
 
-def dense_metrics(p: np.ndarray, pn: np.ndarray, g: np.ndarray, gn: np.ndarray) -> dict[str, float]:
+def dense_metrics(p: np.ndarray, pn: np.ndarray, g: np.ndarray, gn: np.ndarray, taus=TAUS) -> dict[str, float]:
     """NC, precision / recall / F1 at each tau, squared Chamfer (kept for HD-PEA-style comparison), normal sign agreement."""
     d_pg, i_pg = cKDTree(g).query(p)
     d_gp, i_gp = cKDTree(p).query(g)
     out = {"NC": float(0.5 * (np.abs((pn * gn[i_pg]).sum(1)).mean() + np.abs((gn * pn[i_gp]).sum(1)).mean())),
            "cd_sq": float((d_pg ** 2).mean() + (d_gp ** 2).mean()),
            "normal_outward": float(((pn * gn[i_pg]).sum(1) > 0).mean())}
-    for tau in TAUS:
+    for tau in taus:
         prec, rec = float((d_pg < tau).mean()), float((d_gp < tau).mean())
         out[f"P@{tau}"], out[f"R@{tau}"] = prec, rec
         out[f"F1@{tau}"] = 0.0 if prec + rec == 0 else 2 * prec * rec / (prec + rec)
@@ -70,7 +71,12 @@ def score_mesh(pred: trimesh.Trimesh, gt: trimesh.Trimesh) -> dict[str, float]:
 
 
 def score_points(points: np.ndarray, normals: np.ndarray, gt: trimesh.Trimesh, seed: int = 0) -> dict[str, float]:
-    """Protocol v1 for an oriented point cloud already in the GT frame (random subsamples stand in for surface samples)."""
+    """Protocol v1 for an oriented point cloud already in the GT frame (random subsamples stand in for surface samples).
+
+    Protocol numbers use random subsamples of the cloud (5,000 for CD / HD, 100,000 for NC / F1), so a denser cloud
+    of the same surface scores the same. The "all" entries (P_all, R_all, F1_all at each tau) use every point of the
+    cloud against the 100,000 GT samples: the recall there is what extra density can buy.
+    """
     centre, scale = unit_cube_transform(gt)
     gt_n = trimesh.Trimesh((gt.vertices - centre) * scale, gt.faces, process=False)
     pts = (np.asarray(points, np.float64) - centre) * scale
@@ -79,8 +85,15 @@ def score_points(points: np.ndarray, normals: np.ndarray, gt: trimesh.Trimesh, s
     i_dn = rng.choice(len(pts), min(N_DENSE, len(pts)), replace=False)
     cd, hd = chamfer_hausdorff(pts[i_cd], sample_surface(gt_n, N_CD, seed=1)[0])
     g, gn = sample_surface(gt_n, N_DENSE, seed=1)
-    out = {"CD": 100 * cd, "HD": 100 * hd, **dense_metrics(pts[i_dn].astype(np.float32), np.asarray(normals, np.float32)[i_dn], g, gn),
+    out = {"CD": 100 * cd, "HD": 100 * hd,
+           **dense_metrics(pts[i_dn].astype(np.float32), np.asarray(normals, np.float32)[i_dn], g, gn, TAUS_POINTS),
            "V": int(len(pts))}
+    d_pg, _ = cKDTree(g).query(pts)
+    d_gp, _ = cKDTree(pts).query(g)
+    for tau in TAUS_POINTS:
+        prec, rec = float((d_pg < tau).mean()), float((d_gp < tau).mean())
+        out[f"P_all@{tau}"], out[f"R_all@{tau}"] = prec, rec
+        out[f"F1_all@{tau}"] = 0.0 if prec + rec == 0 else 2 * prec * rec / (prec + rec)
     return out
 
 

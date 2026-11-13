@@ -36,3 +36,14 @@ def test_triangle_quality():
     sliver = trimesh.Trimesh([[0, 0, 0], [1, 0, 0], [0.5, 0.01, 0]], [[0, 1, 2]])
     assert abs(triangle_quality(eq) - 1.0) < 1e-6
     assert triangle_quality(sliver) < 0.05
+
+
+def test_points_all_metrics_reward_density():
+    import trimesh
+    from photo2mesh.eval.protocol import score_points
+    gt = trimesh.creation.icosphere(subdivisions=4)
+    sparse, _ = trimesh.sample.sample_surface(gt, 2_000, seed=0)
+    dense, _ = trimesh.sample.sample_surface(gt, 300_000, seed=0)
+    a = score_points(sparse, sparse / np.linalg.norm(sparse, axis=1, keepdims=True), gt)
+    b = score_points(dense, dense / np.linalg.norm(dense, axis=1, keepdims=True), gt)
+    assert "F1@0.005" in b and b["R_all@0.005"] > a["R_all@0.005"] + 0.2
