@@ -23,3 +23,6 @@ venv/
 
 # local Claude settings
 .claude/settings.local.json
+
+# Meeting decks live outside the repo: ../Zhong Meetings Presentations
+docs/slides/
