@@ -175,7 +175,8 @@ def main() -> None:
           "Same VGGT pass (8 views, known focal) per shape; the TSDF voxel is a fraction of the object size (bbox of "
           "the fused pixels, 1st to 99th percentile), truncation 6 voxels, and n points are sampled from the fused "
           "surface (area-uniform). 0.005 / 200k is the v3 default (the sweep reproduces it byte for byte, job "
-          "`same_as_v3`). Time = fusion + small-piece removal + sampling, CPU, per object; peak = largest resident "
+          "`same_as_v3`, on 18 of 19 shapes; on wheel_76903 positions and normals are identical and one point's "
+          "colour differs by 1/255, from the faster small-piece removal; colour is not scored). Time = fusion + small-piece removal + sampling, CPU, per object; peak = largest resident "
           "memory of the fusion process over the shapes.", ""]
     for name, shapes in SETS:
         n = len(shapes)

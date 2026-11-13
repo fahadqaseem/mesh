@@ -3,13 +3,13 @@
 One entry per run. Newest on top. Claude: append here after every run, and keep "Next up" current.
 
 ## Next up
-1. [ ] Unseen surface (24% of the gap: the rig never sees the underside): add views from below, or mesher-side
-       completion (route b), depending on Prof. Zhong's answer.
-2. [ ] Lab GPU: VGGT with 16 views (8 vs 16; the same two rings add only 0-6% visible surface).
-3. [ ] Retune TSDF on pencilpot only if needed (Hausdorff still 22 vs 4 upper bound; size 1.08).
-4. [ ] Gaussians beyond centres: opacity/scale/colour for the render-back loop (priority 2), not as a point source.
-5. [ ] Guidance 2.5 vs 1.0 numerical check (own process).
-6. [ ] December (with the colour render-back loop): add Google Scanned Objects for real textures.
+1. [ ] TSDF + Gaussian-kernel union (or kernels only where the TSDF surface is missing): kernels win on the thin or
+       detailed shapes where TSDF is worst (thingi_103356 F1@0.01 0.37 vs 0.14). Pilot on pencilpot, then set A/B.
+2. [ ] ShapeNet / Toys4K: Fahad requests access (ShapeNetCore terms on Hugging Face; Toys4K form), then
+       `scripts/prep_dataset.py --n 3` on the real files before any full run.
+3. [ ] Decide with Prof. Zhong (Mon 16 Nov): dense output at 1M points (voxel 0.005) as the default?
+4. [ ] Lab GPU: VGGT with 16 views (the depth maps, not the fusion grid, limit the points now).
+5. [ ] Unseen surface (the rig never sees the underside): views from below.
 
 Done: env + pytest (11-06); MeshFlow weights downloaded (11-07); 8 Thingi10K shapes rendered v1 (Y-up, 2 rings x 8,
 procedural texture); VGGT on all 8 scenes (16 views); alignment stage (camera Umeyama + ICP); point-cloud evaluation;
@@ -19,6 +19,7 @@ overnight tooling (11-07); overnight run, 215 jobs, steps 1-5 (11-07);
 Friday summary docs/results/2026-11-13_friday_summary.md (11-07); robustness run, Experiments A and B, 600 jobs (11-07);
 point head vs depth unprojection (11-07); size bias explained by noise (11-07);
 TSDF fusion made the default points stage, v3 headline rerun (11-09); Gaussian centres with msplat (11-09).
+pipeline explainer docs/pipeline_explained.md (11-12); points_v1: points-first scoring, TSDF density sweep, Gaussian kernels, 866 jobs (11-12); ShapeNet/Toys4K prep script (11-12, tested on stand-ins).
 
 ## Template
 ```
@@ -32,6 +33,33 @@ Next:
 ```
 
 ## Runs
+
+### 2026-11-12  points_v1  (points first: TSDF density sweep, Gaussian kernel sampling; protocol v1 on the clouds)
+Goal: Prof. Zhong's new direction (9 Nov): the point cloud is the main output. Score every points stage directly
+  against the GT, sweep the TSDF density, and sample points from the Gaussian kernels (not just centres).
+Command: `python scripts/make_points_queue.py` then scripts/overnight.sh with QUEUE_DIR=outputs/points_queue
+  (21:20 to 23:12, 866 jobs, 864 ok). Report: docs/results/2026-11-12_points.md (scripts/points_report.py).
+Input: dev pencilpot + set A (7) + set B (12), 8 VGGT views, known focal. One new VGGT pass per shape (`_tdraw`,
+  raw depth kept until its TSDF cells were done, then deleted).
+Config: TSDF voxel 0.005 / 0.0025 / 0.00125 x object size, truncation 6 voxels, 200k or 1M points
+  (`scripts/tsdf_points.py`); Gaussian kernels (`scripts/gaussian_kernel_points.py`): 200k samples from the
+  trained 3DGS (same Gaussians as `_gs`), Gaussian picked by opacity (`_gsk`) or opacity x area (`_gska`), 2 sigma
+  truncation, normal = source centre's PCA normal. Scoring: new F1@0.005 and all-points recall (density-sensitive).
+Result (points vs GT, set B mean ± std):
+  TSDF v3 (0.005, 200k): CD 5.61 ± 1.79, HD 21.7, F1@0.01 0.469, F1@0.02 0.708, NC 0.809, coverage 76%.
+  filtered (v2): CD 8.37, F1@0.01 0.379, NC 0.810, coverage 43%. Centres: CD 5.74, F1@0.01 0.256, NC 0.769, 11.5k pts.
+  kernels: CD 5.80, F1@0.01 0.393 (vs centres +0.137, 12/12), NC 0.761, coverage 80% (opacity x area 83%).
+  Sweep: 0.0025 F1@0.01 0.480, NC 0.754, 5.7 s, 4.4 GB; 0.00125 F1@0.01 0.447, NC 0.708, 27 s, 12.7-14.1 GB.
+  1M vs 200k at 0.005: protocol metrics equal, all-points recall @0.01 0.473 -> 0.485, +0.3 s.
+  MeshFlow (secondary, set B CD): 6.24 (v3) / 6.16 (0.0025) / 6.72 (0.00125) / 6.66 (kernels).
+Notes / what I saw:
+  - VGGT is 19-20 s per object; fusion at 0.005 is 1 s. Peak 14.1 GB at voxel 0.00125 / 1M: run one at a time only.
+  - 18 of 19 sweep clouds byte-identical to tex_v3. wheel_76903: same xyz and normals, one colour 1/255 off, from
+    the faster small-piece removal (old function reproduces tex_v3 exactly; checked with a VGGT rerun).
+  - A macOS update snapshot took disk space (21 -> 12 GB free, back to 19 GB); runner min disk is now an env var.
+Takeaway: the depth maps, not the fusion grid or the point count, limit the cloud. TSDF at 0.005 stays the
+  default; 1M points is a cheap dense option; Gaussian kernels beat centres everywhere and beat TSDF on thin shapes.
+Next: TSDF + kernel union; dataset access; 16 views on the lab GPU.
 
 ### 2026-11-09  v3_headline + gaussians_v1  (points stage v3 = TSDF default; Gaussian centres; protocol v1)
 Goal: (1) make TSDF fusion the default points stage (Fahad's decision) and rerun the headline, keeping the v2 filtered
