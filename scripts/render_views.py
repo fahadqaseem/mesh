@@ -4,6 +4,7 @@ This gives us photos where the true shape is known, so the whole pipeline can be
 
 Usage:
     python scripts/render_views.py --mesh data/gt/bunny.stl --out data/scenes/bunny/images_tex --texture procedural
+    (--texture original renders the file's own materials, e.g. ShapeNet; see scripts/prep_dataset.py)
 Writes, next to the images folder (the scene dir):
     gt_cam_poses.npy   (V, 4, 4) camera-to-world, OpenGL convention, in the normalised frame
     gt_normalized.ply  the GT mesh in that same frame (rotated to Y-up, centred, unit sphere)
@@ -88,6 +89,30 @@ def textured_copy(mesh: trimesh.Trimesh, seed: int, max_edge: float = 0.015) -> 
     return fine
 
 
+def baked_copy(geom: trimesh.Trimesh, max_edge: float = 0.015, max_faces: int = 3_000_000) -> trimesh.Trimesh:
+    """The part's own colour as vertex colours: UV textures are sampled at the vertices of a subdivided copy.
+
+    pyrender's GL texture upload fails here (pyrender pins PyOpenGL 3.1.0, which breaks under Python 3.13 / numpy 2),
+    so textures are baked the same way the procedural Thingi10K texture is applied. Untextured materials give their
+    flat colour. Used for rendering only; the GT geometry is the original mesh.
+    """
+    vis = geom.visual
+    image = getattr(getattr(vis, "material", None), "image", None) if vis.kind == "texture" else None
+    if image is None or getattr(vis, "uv", None) is None:
+        out = geom.copy()
+        out.visual = vis.to_color() if vis.kind == "texture" else vis
+        return out
+    v, f, uv = geom.vertices, geom.faces, np.asarray(vis.uv, np.float64)
+    while len(f) * 4 <= max_faces:
+        edges = np.linalg.norm(v[f[:, [1, 2, 0]]] - v[f], axis=2).max()
+        if edges <= max_edge:
+            break
+        v, f, attrs = trimesh.remesh.subdivide(v, f, vertex_attributes={"uv": uv})
+        uv = attrs["uv"]
+    cols = trimesh.visual.uv_to_color(uv, image)
+    return trimesh.Trimesh(v, f, vertex_colors=cols, process=False)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--mesh", required=True)
@@ -95,7 +120,8 @@ def main() -> None:
     ap.add_argument("--n", type=int, default=8, help="views per ring")
     ap.add_argument("--elevations", default="20,50", help="comma-separated ring elevations in degrees")
     ap.add_argument("--up", choices=["z", "y"], default="z", help="up axis of the input mesh (Thingi10K STL: z)")
-    ap.add_argument("--texture", choices=["none", "procedural"], default="none")
+    ap.add_argument("--texture", choices=["none", "procedural", "original"], default="none",
+                    help="original: render the file's own materials / UV textures (e.g. ShapeNet OBJ + MTL)")
     ap.add_argument("--seed", type=int, default=0, help="procedural texture seed")
     ap.add_argument("--size", type=int, default=518)   # VGGT's native resolution
     args = ap.parse_args()
@@ -105,10 +131,20 @@ def main() -> None:
 
     mesh = trimesh.load(args.mesh, force="mesh")
     transform = normalise(mesh, args.up)
-    render_mesh = textured_copy(mesh, args.seed) if args.texture == "procedural" else mesh
-
     scene = pyrender.Scene(bg_color=[1.0, 1.0, 1.0, 1.0], ambient_light=[0.3, 0.3, 0.3])
-    scene.add(pyrender.Mesh.from_trimesh(render_mesh, smooth=False))
+    if args.texture == "original":
+        # same normalisation applied to every textured part of the file, so the render matches gt_normalized.ply
+        src = trimesh.load(args.mesh, force="scene")
+        m = np.eye(4)
+        m[:3, :3] = transform["scale"] * np.asarray(transform["rotation"])
+        m[:3, 3] = -transform["scale"] * np.asarray(transform["centre_after_rotation"])
+        for geom in src.dump(concatenate=False):
+            g = geom.copy()
+            g.apply_transform(m)
+            scene.add(pyrender.Mesh.from_trimesh(baked_copy(g), smooth=False))
+    else:
+        render_mesh = textured_copy(mesh, args.seed) if args.texture == "procedural" else mesh
+        scene.add(pyrender.Mesh.from_trimesh(render_mesh, smooth=False))
     cam = pyrender.PerspectiveCamera(yfov=np.deg2rad(40))
     renderer = pyrender.OffscreenRenderer(args.size, args.size)
 
