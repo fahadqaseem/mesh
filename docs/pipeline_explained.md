@@ -77,7 +77,9 @@ What happens to the input cloud, in order:
 7. **Vertex count:** the number of tokens the mask head keeps (at most 4,096). This is MeshFlow's own generation, not
    a simplification of a dense mesh: there is no QEM / decimation step in MeshFlow or in our code. That is why the
    "ceiling" mesh has fewer vertices (361) than a noisy input gives (982 for TSDF, 2,697 for Gaussian centres): the
-   model places more vertices when its voxel input looks rougher.
+   model places more vertices when its voxel input looks rougher. How the 4,096 points are spread matters too: handed
+   exactly 4,096 evenly spread points (farthest-point sampling, 13 Nov), MeshFlow keeps nearly every token (about
+   3,800 vertices) at the same Chamfer (`docs/results/2026-11-13_fps_input.md`).
 8. The mesh is mapped back by the exact inverse of step 2 (computed from the input cloud, not fitted).
 
 ### 4. Scoring (`src/photo2mesh/eval/protocol.py`, `docs/eval_protocol.md`)

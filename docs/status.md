@@ -1,8 +1,12 @@
 # Status
 
-Snapshot, rewritten at the end of every work block. Last updated: 2026-11-12 23:45.
+Snapshot, rewritten at the end of every work block. Last updated: 2026-11-13 02:10.
 
 ## Latest
+- **FPS input test (13 Nov, 242/242 ok):** handing MeshFlow exactly 4,096 farthest-point-sampled TSDF points (so its
+  random pick keeps all of them) gives the same accuracy (set A 3 seeds Chamfer 5.88 vs 5.83; set B 6.31 vs 6.24) but
+  ~3,800 vertices instead of 740 to 933: MeshFlow keeps nearly every token on evenly spread input. The TSDF + kernel
+  union is worse with either pick. MeshFlow's random pick stays. Report: `docs/results/2026-11-13_fps_input.md`.
 - **New direction (Prof. Zhong, 9 Nov): points side only; the point cloud is the main output.** Every points stage is
   now scored directly against the GT (Chamfer, Hausdorff, F1@0.005/0.01/0.02, NC, coverage, #points, plus a
   density-sensitive all-points recall); MeshFlow meshes are a secondary row. Report:
@@ -42,15 +46,19 @@ Snapshot, rewritten at the end of every work block. Last updated: 2026-11-12 23:
 | Gaussian kernels | B (12) | 5.80 ± 1.39 | 0.393 | 0.680 | 0.761 | 80% | 200k |
 | Gaussian centres | B (12) | 5.74 ± 1.41 | 0.256 | 0.608 | 0.769 | 50% | 11.5k |
 | filtered points (v2) | B (12) | 8.37 ± 3.03 | 0.379 | 0.560 | 0.810 | 43% | 186k |
-- Secondary, MeshFlow on TSDF points (seed 42): set B Chamfer 6.24, F1@0.02 0.598, #V 933; upper bound on clean GT
-  points 2.93 / 0.979 / 265.
+- Secondary, MeshFlow on TSDF points (seed 42): set B Chamfer 6.24, F1@0.02 0.598, #V 933; with 4,096 FPS points
+  6.31 / 0.602 / 3,862; upper bound on clean GT points 2.93 / 0.979 / 265.
 
 ## Next 3 steps
-1. TSDF + Gaussian-kernel union (kernels where the TSDF surface is missing): pilot on pencilpot, then set A/B.
+1. TSDF + Gaussian kernels only where the TSDF surface is missing (the raw union hurts MeshFlow: ~48% of FPS-picked
+   union points are off the surface): pilot on pencilpot, then set A/B.
 2. ShapeNet / Toys4K: a few shapes each once access is granted, then the points pipeline on them.
 3. 16 views on the lab GPU (better depth maps are now the main lever for the points).
 
 ## Open questions
+- **MeshFlow's vertex count depends on how its 4,096 input points are spread** (random surface samples ~900, FPS
+  ~3,800, same accuracy). Worth asking the MeshFlow authors or checking once their training code is out; it matters
+  for any input we design for it.
 - **Dense output by default?** 1M points at voxel 0.005 costs +0.3 s and is safe on the Mac, but is only denser, not
   more accurate under the protocol metrics. For Prof. Zhong on Mon 16 Nov.
 - **Which point metric leads?** The protocol subsamples (5k for Chamfer, 100k for F1), so it is blind to density; the

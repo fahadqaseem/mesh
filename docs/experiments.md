@@ -19,7 +19,7 @@ overnight tooling (11-07); overnight run, 215 jobs, steps 1-5 (11-07);
 Friday summary docs/results/2026-11-13_friday_summary.md (11-07); robustness run, Experiments A and B, 600 jobs (11-07);
 point head vs depth unprojection (11-07); size bias explained by noise (11-07);
 TSDF fusion made the default points stage, v3 headline rerun (11-09); Gaussian centres with msplat (11-09).
-pipeline explainer docs/pipeline_explained.md (11-12); points_v1: points-first scoring, TSDF density sweep, Gaussian kernels, 866 jobs (11-12); ShapeNet/Toys4K prep script (11-12, tested on stand-ins).
+pipeline explainer docs/pipeline_explained.md (11-12); points_v1: points-first scoring, TSDF density sweep, Gaussian kernels, 866 jobs (11-12); ShapeNet/Toys4K prep script (11-12, tested on stand-ins); FPS input test, 242 jobs (11-13).
 
 ## Template
 ```
@@ -33,6 +33,26 @@ Next:
 ```
 
 ## Runs
+
+### 2026-11-13  fps_input  (MeshFlow on exactly 4,096 farthest-point-sampled points vs its own random pick)
+Goal: MeshFlow keeps a random 4,096 of our 200k points (network input fixed at 4,096). Hand it exactly 4,096
+  FPS points so it keeps all of them; also from the TSDF + Gaussian-kernel union.
+Command: `python scripts/make_fps_queue.py` then scripts/overnight.sh with QUEUE_DIR=outputs/fps_queue
+  (00:01 to 01:55, 242/242 ok, 102 MeshFlow runs). Report: docs/results/2026-11-13_fps_input.md (scripts/fps_report.py).
+Input: dev + set A (seeds 42, 7, 123) + set B (seed 42); existing aligned clouds `_tex_v3` (200k) and `_gsk` (200k).
+Config: `_fps` FPS 4,096 of TSDF; `_uni` TSDF + kernels (400k), MeshFlow's random pick; `_fpsu` FPS 4,096 of the
+  union. Baseline: the existing `_tex_v3` meshes. Plus scripts/meshflow_input_stats.py (what MeshFlow sees at 32^3).
+Result: set A 3-seed mean Chamfer / F1@0.02 / #V: random 5.83 / 0.709 / 740; FPS 5.88 / 0.701 / 3,786;
+  union random 8.00 / 0.534 / 1,770; union FPS 6.31 / 0.611 / 3,816. Set B seed 42: random 6.24 / 0.598 / 933;
+  FPS 6.31 / 0.602 / 3,862 (NC 0.830 vs 0.819); union random 7.17; union FPS 6.49 / 0.572 / 3,707.
+Notes / what I saw:
+  - FPS covers more 32^3 cells (set B 1,425 -> 1,692; GT cells hit 0.57 -> 0.64) with the same off-surface share.
+  - MeshFlow keeps nearly every token on FPS input (3,862 ± 107 vertices): evenly spread points are probably out of
+    its training distribution (its inference code only conditions on random surface samples).
+  - FPS on the union covers 79% of GT cells but keeps ~48% off-surface points (the kernels' stray samples).
+Takeaway: FPS does not make the meshes more accurate and quadruples the vertex count; keep MeshFlow's random pick.
+  The union hurts MeshFlow either way until the kernels are cleaned.
+Next: TSDF + kernels only where the TSDF surface is missing (points side); dataset access.
 
 ### 2026-11-12  points_v1  (points first: TSDF density sweep, Gaussian kernel sampling; protocol v1 on the clouds)
 Goal: Prof. Zhong's new direction (9 Nov): the point cloud is the main output. Score every points stage directly
