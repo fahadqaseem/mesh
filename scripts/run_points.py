@@ -86,7 +86,8 @@ def main() -> None:
              cam_centres=pred["cam_centres"], view_ids=np.array(view_ids), intrinsic_pred=intrinsic_pred)
     if cfg.get("fusion", "points") == "tsdf":
         # points stage v3 (default since 2026-11-09): fuse the depth maps, sample the fused surface
-        pts, normals, cols, mesh, info = tsdf_points(pred, cfg, cfg.get("tsdf"), n=cfg.get("max_points") or 200_000)
+        pts, normals, cols, mesh, info = tsdf_points(pred, cfg, cfg.get("tsdf"),
+                                                     n=(cfg.get("tsdf") or {}).get("n_points") or cfg.get("max_points") or 200_000)
         info["vggt_s"] = None if args.reuse_raw else vggt_s
         info["peak_rss_gb"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1e9
         save_points_ply(out_dir / "points.ply", pts, normals=normals, colors=cols)

@@ -40,7 +40,7 @@ def main() -> None:
     ap.add_argument("--min-views", type=int, default=None, help="extract the surface where at least this many views saw it")
     ap.add_argument("--min-part", type=float, default=None, help="drop pieces under this fraction of the area")
     ap.add_argument("--mv-rel", type=float, default=None, help="multi-view pixel filter before fusion (0 = off)")
-    ap.add_argument("--n", type=int, default=200_000)
+    ap.add_argument("--n", type=int, default=None, help="points to sample (default: points.tsdf.n_points)")
     args = ap.parse_args()
     cfg = yaml.safe_load(open(args.config))["points"]
     for kv in args.set:
@@ -58,7 +58,7 @@ def main() -> None:
         if getattr(args, key) is not None:
             tcfg[key] = getattr(args, key)
     try:
-        pts, nrm, cols, mesh, tinfo = tsdf_points(pred, cfg, tcfg, args.n)
+        pts, nrm, cols, mesh, tinfo = tsdf_points(pred, cfg, tcfg, args.n or tcfg.get("n_points") or 200_000)
     except RuntimeError as e:
         raise SystemExit(f"[tsdf] {e}")
 

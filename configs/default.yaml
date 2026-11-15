@@ -8,6 +8,7 @@ points:
     trunc_vox: 6                 # truncation = 6 voxels
     min_views: 1                 # surface wherever at least one view saw it
     min_part: 0.01               # drop fused pieces under 1% of the area
+    n_points: 1000000            # dense output is the default (Prof. Zhong, 9 Nov; decided 15 Nov); was 200k
   view_ids: [0, 2, 4, 6, 9, 11, 13, 15]   # 8 views, 4 per ring (Mac memory rule); "all" for every image
   edge_rel: 0.0                  # depth-edge filter: drop pixels whose depth jumps > edge_rel * depth vs a neighbour (0 = off)
   edge_dilate: 1                 # widen detected edges by this many pixels
