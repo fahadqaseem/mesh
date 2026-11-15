@@ -128,9 +128,10 @@ def section_pictures(L: list[str], out: Path) -> None:
         return
     L += ["## 4. Pictures: TSDF vs gap-filled, coloured by distance to the GT", "",
           f"![TSDF vs gap fill]({os.path.relpath(p, out.parent)})", "",
-          "thingi_103356, thingi_77949 and thingi_593381 (set B, the three shapes where TSDF is worst). Top: the dense TSDF "
-          "cloud; bottom: the dense gap-filled cloud. Colour = distance to the GT surface (% of the GT's largest extent, "
-          "clipped at 5%); GT surface regions with no point within 2% are drawn in grey on the GT.", ""]
+          "thingi_103356, thingi_77949 and thingi_593381 (set B, the three shapes where TSDF is worst; `scripts/fig_gapfill.py`). "
+          "Left: the dense TSDF cloud (1M, the default); middle: the dense gap-filled cloud; right: the GT. Colour = "
+          "distance to the GT surface (% of the GT's largest extent, 0 to 3%). \"On surface\" = share of points within 1% "
+          "of the GT; \"covers\" = share of the GT surface within 1% of any point (the all-points recall @0.01).", ""]
 
 
 def main() -> None:
