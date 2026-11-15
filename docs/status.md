@@ -1,8 +1,17 @@
 # Status
 
-Snapshot, rewritten at the end of every work block. Last updated: 2026-11-15 00:00 (block in progress: views, MeshFlow vertex control, pictures).
+Snapshot, rewritten at the end of every work block. Last updated: 2026-11-15 00:40.
 
 ## Latest
+- **Block of 15 Nov done** (`docs/results/2026-11-15_dense.md`, summary on top):
+  - Dense output (1M points) is the default; the dense gap-filled cloud is the best cloud: set B Chamfer 5.31 (was
+    5.61), recall all @0.02 0.827 (was 0.677), coverage 85% (was 76%).
+  - 12 and 16 VGGT views run safely on the laptop (memory guard, 40 runs, never red, lowest free 13%). 16 views: set B
+    F1@0.01 0.469 to 0.552, NC 0.809 to 0.832, recall up on 12 of 12; but Chamfer 5.59 to 5.85 (far floaters). Default
+    stays at 8 views until TSDF min_views is piloted for more views.
+  - Skipped: MeshFlow vertex control (the public checkpoint has no trained num_verts layer: config lacks
+    use_proj_cond_on_temb and model.pth has no t_embedder.cond_proj weights).
+  - Picture: `docs/results/figures/2026-11-15_gapfill_compare.png` (TSDF vs gap fill on the 3 hardest set B shapes).
 - **Gap filling (14 Nov, 139/139 ok): best point cloud so far.** TSDF points plus the Gaussian-kernel samples that lie
   3-10% from the TSDF cloud (~20k added, no GT used): set B Chamfer 5.61 to 5.34 (better on 8 of 12), F1@0.02 0.708 to
   0.732, coverage 76% to 82%, all-points recall @0.02 +0.12 (12 of 12); F1@0.01 -0.004. As a MeshFlow input it is
@@ -37,7 +46,6 @@ Snapshot, rewritten at the end of every work block. Last updated: 2026-11-15 00:
   https://huggingface.co/datasets/ShapeNet/ShapeNetCore; Toys4K, the form linked from
   https://github.com/rehg-lab/lowshot-shapebias/tree/main/toys4k. Then `python scripts/prep_dataset.py --dataset
   shapenet --root data/shapenet_raw --n 3` (and the same for toys4k) renders a few shapes; the full sets are not run yet.
-- 16-view VGGT needs the lab GPU (Mac: 16 views ~19 GB of 24 GB).
 - Disk: a pending macOS update snapshot takes several GB (free space went 21 -> 12 -> 19 GB). Installing or removing
   the update frees it.
 
@@ -56,18 +64,18 @@ Dense output is the default since 15 Nov (1M points). "Recall all" = share of th
   either way, so 1M vs 200k does not change its input distribution); upper bound on clean GT points 2.93 / 0.979 / 265.
 
 ## Next 3 steps
-1. Meeting Mon 16 Nov: show the points-first results; ask about the points default (gap fill) and the open questions.
-2. ShapeNet / Toys4K: a few shapes each once access is granted, then the points pipeline on them.
-3. 16 views on the lab GPU (better depth maps are now the main lever for the points).
+1. Meeting Mon 16 Nov: the three numbers (Chamfer 5.31, coverage 85%, 16-view F1@0.01 0.55) and the open questions.
+2. 12/16 views: pilot TSDF min_views 2 on pencilpot, then set A/B, then the gap fill on 16-view clouds.
+3. ShapeNet / Toys4K once access is granted.
 
 ## Open questions
+- **16 views as the default?** Safe on the laptop and better on F1, NC and recall, worse on Chamfer until the
+  floaters are handled. For Prof. Zhong; my plan is to pilot min_views first.
 - **Points default = TSDF + gap fill?** Better cloud on every main metric except F1@0.01 (-0.004), but it needs the
   3DGS step (~10 s per object with msplat, not bit-reproducible) and is a worse MeshFlow input. For Prof. Zhong.
 - **MeshFlow's vertex count depends on how its 4,096 input points are spread** (random surface samples ~900, FPS
   ~3,800, same accuracy). Worth asking the MeshFlow authors or checking once their training code is out; it matters
   for any input we design for it.
-- **Dense output by default?** 1M points at voxel 0.005 costs +0.3 s and is safe on the Mac, but is only denser, not
-  more accurate under the protocol metrics. For Prof. Zhong on Mon 16 Nov.
 - **Which point metric leads?** The protocol subsamples (5k for Chamfer, 100k for F1), so it is blind to density; the
   all-points recall is the density-sensitive one. Proposal: keep Chamfer + F1@0.01 as the headline, report the
   all-points recall next to them.

@@ -3,12 +3,11 @@
 One entry per run. Newest on top. Claude: append here after every run, and keep "Next up" current.
 
 ## Next up
-1. [ ] Mon 16 Nov with Prof. Zhong: points default = TSDF + gap fill (3-10%)? Dense 1M output? Which point metric leads?
-2. [ ] ShapeNet / Toys4K: Fahad requests access (ShapeNetCore terms on Hugging Face; Toys4K form), then
-       `scripts/prep_dataset.py --n 3` on the real files before any full run.
-3. [ ] Lab GPU: VGGT with 16 views (the depth maps, not the fusion grid, limit the points now).
-4. [ ] Finer gap points: the added kernel points are coarse (F1@0.01 slightly down); e.g. snap them to a local
-       surface fit, or refit the TSDF with the kernels as extra depth evidence.
+1. [ ] Mon 16 Nov with Prof. Zhong: show the dense gap-filled cloud and the views result; ask about the open questions.
+2. [ ] 12/16 views: pilot TSDF min_views 2 on pencilpot (floaters from single views), then set A/B; then the gap fill
+       on the 16-view clouds.
+3. [ ] ShapeNet / Toys4K: Fahad requests access, then `scripts/prep_dataset.py --n 3` on the real files.
+4. [ ] Finer gap points (snap the kernel points to a local surface fit).
 5. [ ] Unseen surface (the rig never sees the underside): views from below.
 
 Done: env + pytest (11-06); MeshFlow weights downloaded (11-07); 8 Thingi10K shapes rendered v1 (Y-up, 2 rings x 8,
@@ -19,7 +18,7 @@ overnight tooling (11-07); overnight run, 215 jobs, steps 1-5 (11-07);
 Friday summary docs/results/2026-11-13_friday_summary.md (11-07); robustness run, Experiments A and B, 600 jobs (11-07);
 point head vs depth unprojection (11-07); size bias explained by noise (11-07);
 TSDF fusion made the default points stage, v3 headline rerun (11-09); Gaussian centres with msplat (11-09).
-pipeline explainer docs/pipeline_explained.md (11-12); points_v1: points-first scoring, TSDF density sweep, Gaussian kernels, 866 jobs (11-12); ShapeNet/Toys4K prep script (11-12, tested on stand-ins); FPS input test, 242 jobs (11-13); gap filling TSDF + kernels, 139 jobs (11-14).
+pipeline explainer docs/pipeline_explained.md (11-12); points_v1: points-first scoring, TSDF density sweep, Gaussian kernels, 866 jobs (11-12); ShapeNet/Toys4K prep script (11-12, tested on stand-ins); FPS input test, 242 jobs (11-13); gap filling TSDF + kernels, 139 jobs (11-14); dense default, 8/12/16 views, gap-fill figure (11-15).
 
 ## Template
 ```
@@ -33,6 +32,23 @@ Next:
 ```
 
 ## Runs
+
+### 2026-11-15  dense_default + views_8_12_16 + gapfill figure  (block of 15 Nov)
+Goal: (1) dense output (1M) as the default, gap fill at the same density; (2) 12 and 16 VGGT views on the laptop;
+  (3) MeshFlow vertex control; (4) pictures; (5) docs/results/2026-11-15_dense.md.
+Command: make_dense_queue.py (200 jobs, 23:20 to 23:28, all ok); views pilot via scripts/views_run.sh (memory guard)
+  on pencilpot + thingi_103356/77949/593381, then make_views_queue.py (32 jobs, 23:39 to 00:04, all ok);
+  fig_gapfill.py. Report: docs/results/2026-11-15_dense.md (scripts/dense_report.py).
+Config: points.tsdf.n_points 1,000,000 (new default); resample_tsdf.py resamples tex_v3's fused surface (identical
+  metrics to a fresh run); gap fill 3-10% with 1M kernel samples; views: 12 = 0,1,2,4,5,6,9,10,11,13,14,15, 16 = all,
+  518 px (img_size option added, not needed); mem_guard.py kills a run at critical pressure or < 5% free.
+Result (set B points): dense TSDF 5.59 / F1@0.01 0.469 / F1@0.02 0.708 / R_all@0.02 0.682 / cov 77%; dense gap fill
+  5.31 / 0.466 / 0.732 / 0.827 / 85%. Views 8/12/16: CD 5.59/5.63/5.85, F1@0.01 0.469/0.509/0.552, F1@0.02
+  0.708/0.747/0.757, NC 0.809/0.826/0.832. Memory: worst yellow, lowest free 13%, swap up to 6 GB, no abort.
+  MeshFlow num_verts: not supported by the checkpoint (no cond_proj weights).
+Takeaway: the dense gap-filled cloud is the best output; more views help F1/NC/recall but add floaters (Chamfer);
+  vertex control is not available in the public MeshFlow.
+Next: pilot TSDF min_views 2 for 12/16 views on pencilpot; gap fill on 16-view clouds; dataset access.
 
 ### 2026-11-14  gap_fill  (TSDF points + Gaussian-kernel points only where the TSDF surface is missing)
 Goal: Next-up item 1: add kernel points only in the TSDF's gaps, instead of the raw union that hurt MeshFlow.
