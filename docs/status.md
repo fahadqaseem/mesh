@@ -1,6 +1,6 @@
 # Status
 
-Snapshot, rewritten at the end of every work block. Last updated: 2026-11-14 23:20.
+Snapshot, rewritten at the end of every work block. Last updated: 2026-11-15 00:00 (block in progress: views, MeshFlow vertex control, pictures).
 
 ## Latest
 - **Gap filling (14 Nov, 139/139 ok): best point cloud so far.** TSDF points plus the Gaussian-kernel samples that lie
@@ -42,18 +42,18 @@ Snapshot, rewritten at the end of every work block. Last updated: 2026-11-14 23:
   the update frees it.
 
 ## Current numbers (points vs GT, protocol v1, mean ± std over shapes, dev shape excluded)
-| points stage | set | Chamfer | F1@0.01 | F1@0.02 | NC | coverage | #points |
-|---|---|---|---|---|---|---|---|
-| TSDF + kernel gap fill 3-10% (best) | B (12) | 5.34 ± 1.53 | 0.465 | 0.732 | 0.808 | 82% | 220k |
-| TSDF + kernel gap fill 3-10% | A (7) | 5.42 ± 1.74 | 0.510 | 0.763 | 0.800 | 82% | 213k |
-| TSDF, voxel 0.005 (default) | B (12) | 5.61 ± 1.79 | 0.469 | 0.708 | 0.809 | 76% | 200k |
-| TSDF, voxel 0.005 | A (7) | 5.58 ± 1.93 | 0.515 | 0.751 | 0.803 | 77% | 200k |
-| TSDF, voxel 0.0025 | B (12) | 5.62 ± 1.78 | 0.480 | 0.709 | 0.754 | 76% | 200k |
-| Gaussian kernels | B (12) | 5.80 ± 1.39 | 0.393 | 0.680 | 0.761 | 80% | 200k |
-| Gaussian centres | B (12) | 5.74 ± 1.41 | 0.256 | 0.608 | 0.769 | 50% | 11.5k |
-| filtered points (v2) | B (12) | 8.37 ± 3.03 | 0.379 | 0.560 | 0.810 | 43% | 186k |
-- Secondary, MeshFlow on TSDF points (seed 42): set B Chamfer 6.24, F1@0.02 0.598, #V 933; with 4,096 FPS points
-  6.31 / 0.602 / 3,862; upper bound on clean GT points 2.93 / 0.979 / 265.
+Dense output is the default since 15 Nov (1M points). "Recall all" = share of the GT surface within tau of any point.
+| points stage | set | Chamfer | F1@0.01 | F1@0.02 | recall all @0.01 | recall all @0.02 | NC | coverage | #points |
+|---|---|---|---|---|---|---|---|---|---|
+| TSDF + gap fill, 1M base (best) | B (12) | 5.31 ± 1.54 | 0.466 | 0.732 | 0.550 | 0.827 | 0.808 | 85% | 1.10M |
+| TSDF, 1M (default) | B (12) | 5.59 ± 1.80 | 0.469 | 0.708 | 0.485 | 0.682 | 0.809 | 77% | 1M |
+| TSDF, 200k (previous default) | B (12) | 5.61 ± 1.79 | 0.469 | 0.708 | 0.473 | 0.677 | 0.809 | 76% | 200k |
+| TSDF + gap fill, 1M base (best) | A (7) | 5.39 ± 1.74 | 0.510 | 0.763 | 0.578 | 0.830 | 0.800 | 84% | 1.06M |
+| TSDF, 1M (default) | A (7) | 5.56 ± 1.91 | 0.516 | 0.751 | 0.532 | 0.735 | 0.801 | 77% | 1M |
+| Gaussian kernels | B (12) | 5.80 ± 1.39 | 0.393 | 0.680 | 0.534 | 0.770 | 0.761 | 80% | 200k |
+| filtered points (v2) | B (12) | 8.37 ± 3.03 | 0.379 | 0.560 | - | - | 0.810 | 43% | 186k |
+- Secondary, MeshFlow on TSDF points (seed 42): set B Chamfer 6.24, F1@0.02 0.598, #V 933 (MeshFlow keeps a random 4,096
+  either way, so 1M vs 200k does not change its input distribution); upper bound on clean GT points 2.93 / 0.979 / 265.
 
 ## Next 3 steps
 1. Meeting Mon 16 Nov: show the points-first results; ask about the points default (gap fill) and the open questions.
