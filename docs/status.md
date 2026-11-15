@@ -1,8 +1,12 @@
 # Status
 
-Snapshot, rewritten at the end of every work block. Last updated: 2026-11-13 02:10.
+Snapshot, rewritten at the end of every work block. Last updated: 2026-11-14 23:20.
 
 ## Latest
+- **Gap filling (14 Nov, 139/139 ok): best point cloud so far.** TSDF points plus the Gaussian-kernel samples that lie
+  3-10% from the TSDF cloud (~20k added, no GT used): set B Chamfer 5.61 to 5.34 (better on 8 of 12), F1@0.02 0.708 to
+  0.732, coverage 76% to 82%, all-points recall @0.02 +0.12 (12 of 12); F1@0.01 -0.004. As a MeshFlow input it is
+  worse (6.24 to 6.70), so MeshFlow keeps the plain TSDF cloud. Report: `docs/results/2026-11-14_gap_fill.md`.
 - **FPS input test (13 Nov, 242/242 ok):** handing MeshFlow exactly 4,096 farthest-point-sampled TSDF points (so its
   random pick keeps all of them) gives the same accuracy (set A 3 seeds Chamfer 5.88 vs 5.83; set B 6.31 vs 6.24) but
   ~3,800 vertices instead of 740 to 933: MeshFlow keeps nearly every token on evenly spread input. The TSDF + kernel
@@ -24,9 +28,9 @@ Snapshot, rewritten at the end of every work block. Last updated: 2026-11-13 02:
 
 ## What works
 - Render -> VGGT (8 views) -> TSDF fusion -> camera alignment -> points scored vs GT -> MeshFlow -> protocol v1, all on
-  the Mac under the memory rules. Points sources: TSDF (default), filtered (v2), Gaussian centres, Gaussian kernels.
+  the Mac under the memory rules. Points sources: TSDF (default), filtered (v2), Gaussian centres, Gaussian kernels, TSDF + kernel gap fill.
 - TSDF stage standalone from a saved raw depth file (`scripts/tsdf_points.py`), with timing and peak memory.
-- Queue tooling (`scripts/overnight.sh`; disk and memory thresholds via MIN_DISK_GB / MIN_MEM_PCT). 33 tests pass.
+- Queue tooling (`scripts/overnight.sh`; disk and memory thresholds via MIN_DISK_GB / MIN_MEM_PCT). 36 tests pass.
 
 ## Blocked
 - **ShapeNetCore v2 and Toys4K are gated.** Fahad must request access himself: ShapeNetCore, accept the terms at
@@ -40,6 +44,8 @@ Snapshot, rewritten at the end of every work block. Last updated: 2026-11-13 02:
 ## Current numbers (points vs GT, protocol v1, mean ± std over shapes, dev shape excluded)
 | points stage | set | Chamfer | F1@0.01 | F1@0.02 | NC | coverage | #points |
 |---|---|---|---|---|---|---|---|
+| TSDF + kernel gap fill 3-10% (best) | B (12) | 5.34 ± 1.53 | 0.465 | 0.732 | 0.808 | 82% | 220k |
+| TSDF + kernel gap fill 3-10% | A (7) | 5.42 ± 1.74 | 0.510 | 0.763 | 0.800 | 82% | 213k |
 | TSDF, voxel 0.005 (default) | B (12) | 5.61 ± 1.79 | 0.469 | 0.708 | 0.809 | 76% | 200k |
 | TSDF, voxel 0.005 | A (7) | 5.58 ± 1.93 | 0.515 | 0.751 | 0.803 | 77% | 200k |
 | TSDF, voxel 0.0025 | B (12) | 5.62 ± 1.78 | 0.480 | 0.709 | 0.754 | 76% | 200k |
@@ -50,12 +56,13 @@ Snapshot, rewritten at the end of every work block. Last updated: 2026-11-13 02:
   6.31 / 0.602 / 3,862; upper bound on clean GT points 2.93 / 0.979 / 265.
 
 ## Next 3 steps
-1. TSDF + Gaussian kernels only where the TSDF surface is missing (the raw union hurts MeshFlow: ~48% of FPS-picked
-   union points are off the surface): pilot on pencilpot, then set A/B.
+1. Meeting Mon 16 Nov: show the points-first results; ask about the points default (gap fill) and the open questions.
 2. ShapeNet / Toys4K: a few shapes each once access is granted, then the points pipeline on them.
 3. 16 views on the lab GPU (better depth maps are now the main lever for the points).
 
 ## Open questions
+- **Points default = TSDF + gap fill?** Better cloud on every main metric except F1@0.01 (-0.004), but it needs the
+  3DGS step (~10 s per object with msplat, not bit-reproducible) and is a worse MeshFlow input. For Prof. Zhong.
 - **MeshFlow's vertex count depends on how its 4,096 input points are spread** (random surface samples ~900, FPS
   ~3,800, same accuracy). Worth asking the MeshFlow authors or checking once their training code is out; it matters
   for any input we design for it.

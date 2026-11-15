@@ -3,12 +3,12 @@
 One entry per run. Newest on top. Claude: append here after every run, and keep "Next up" current.
 
 ## Next up
-1. [ ] TSDF + Gaussian-kernel union (or kernels only where the TSDF surface is missing): kernels win on the thin or
-       detailed shapes where TSDF is worst (thingi_103356 F1@0.01 0.37 vs 0.14). Pilot on pencilpot, then set A/B.
+1. [ ] Mon 16 Nov with Prof. Zhong: points default = TSDF + gap fill (3-10%)? Dense 1M output? Which point metric leads?
 2. [ ] ShapeNet / Toys4K: Fahad requests access (ShapeNetCore terms on Hugging Face; Toys4K form), then
        `scripts/prep_dataset.py --n 3` on the real files before any full run.
-3. [ ] Decide with Prof. Zhong (Mon 16 Nov): dense output at 1M points (voxel 0.005) as the default?
-4. [ ] Lab GPU: VGGT with 16 views (the depth maps, not the fusion grid, limit the points now).
+3. [ ] Lab GPU: VGGT with 16 views (the depth maps, not the fusion grid, limit the points now).
+4. [ ] Finer gap points: the added kernel points are coarse (F1@0.01 slightly down); e.g. snap them to a local
+       surface fit, or refit the TSDF with the kernels as extra depth evidence.
 5. [ ] Unseen surface (the rig never sees the underside): views from below.
 
 Done: env + pytest (11-06); MeshFlow weights downloaded (11-07); 8 Thingi10K shapes rendered v1 (Y-up, 2 rings x 8,
@@ -19,7 +19,7 @@ overnight tooling (11-07); overnight run, 215 jobs, steps 1-5 (11-07);
 Friday summary docs/results/2026-11-13_friday_summary.md (11-07); robustness run, Experiments A and B, 600 jobs (11-07);
 point head vs depth unprojection (11-07); size bias explained by noise (11-07);
 TSDF fusion made the default points stage, v3 headline rerun (11-09); Gaussian centres with msplat (11-09).
-pipeline explainer docs/pipeline_explained.md (11-12); points_v1: points-first scoring, TSDF density sweep, Gaussian kernels, 866 jobs (11-12); ShapeNet/Toys4K prep script (11-12, tested on stand-ins); FPS input test, 242 jobs (11-13).
+pipeline explainer docs/pipeline_explained.md (11-12); points_v1: points-first scoring, TSDF density sweep, Gaussian kernels, 866 jobs (11-12); ShapeNet/Toys4K prep script (11-12, tested on stand-ins); FPS input test, 242 jobs (11-13); gap filling TSDF + kernels, 139 jobs (11-14).
 
 ## Template
 ```
@@ -33,6 +33,23 @@ Next:
 ```
 
 ## Runs
+
+### 2026-11-14  gap_fill  (TSDF points + Gaussian-kernel points only where the TSDF surface is missing)
+Goal: Next-up item 1: add kernel points only in the TSDF's gaps, instead of the raw union that hurt MeshFlow.
+Command: `python scripts/make_fill_queue.py` then scripts/overnight.sh with QUEUE_DIR=outputs/fill_queue
+  (22:42 to 23:03, 139/139 ok, 19 MeshFlow). Report: docs/results/2026-11-14_gap_fill.md (scripts/fill_report.py).
+Input: dev + set A + set B, existing aligned `_tex_v3` (200k) and `_gsk` (200k kernel samples); no new VGGT or 3DGS.
+Config: keep kernel samples whose distance to the nearest TSDF point is in (lo, hi] x the TSDF cloud's extent
+  (src/photo2mesh/points/fill.py, no GT). `_tfill` 3-10% (primary), `_tfill2` 2-5%; chosen on pencilpot only
+  (pilot grid: also 2-4%, 5-10%, and a neighbour-count filter, which made pencilpot worse).
+Pre-check (GT, analysis only): only 15-40% of kernel points in TSDF gaps (> 3%) lie within 2% of the GT; opacity,
+  size and flatness of the source Gaussian do not separate them (AUC 0.4-0.6).
+Result (points vs GT, set B): TSDF 5.61 / F1@0.01 0.469 / F1@0.02 0.708 / NC 0.809 / cov 76% / R_all@0.02 0.677;
+  fill 3-10%: 5.34 / 0.465 / 0.732 / 0.808 / 82% / 0.794 (+20k points); fill 2-5%: 5.36 / 0.467 / 0.731 / 0.803 /
+  83% / 0.817 (+55k). Set A fill 3-10%: Chamfer 5.42 vs 5.58. MeshFlow on fill 3-10% (set B): 6.70 vs 6.24, NC 0.773.
+Takeaway: the gap-filled cloud is the best point cloud so far (Chamfer, F1@0.02, coverage, recall; F1@0.01 -0.004),
+  but a worse MeshFlow input. The best cloud and the best MeshFlow input are now different clouds.
+Next: decide with Prof. Zhong whether the points default becomes TSDF + gap fill; dataset access; 16 views.
 
 ### 2026-11-13  fps_input  (MeshFlow on exactly 4,096 farthest-point-sampled points vs its own random pick)
 Goal: MeshFlow keeps a random 4,096 of our 200k points (network input fixed at 4,096). Hand it exactly 4,096
