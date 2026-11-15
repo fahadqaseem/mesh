@@ -64,7 +64,8 @@ def main() -> None:
         view_ids = [int(i) for i in pred.pop("view_ids", view_ids)]
     else:
         t_vggt = time.time()
-        pred = run_vggt([images[i] for i in view_ids], use_depth_unprojection=cfg["use_depth_unprojection"])
+        pred = run_vggt([images[i] for i in view_ids], use_depth_unprojection=cfg["use_depth_unprojection"],
+                        img_size=int(cfg.get("img_size", 518)))
         vggt_s = time.time() - t_vggt
         pred["view_ids"] = np.array(view_ids)
         if args.keep_raw:
@@ -81,7 +82,7 @@ def main() -> None:
     elif cfg.get("intrinsics", "predicted") == "known":
         # calibrated setting: the render focal is known (as EXIF would give for real photos); re-unproject VGGT depth
         meta = json.loads((Path(args.images).parent / "gt_transform.json").read_text())
-        set_known_intrinsics(pred, meta["size"], meta["yfov_deg"])
+        set_known_intrinsics(pred, pred["depth"].shape[2], meta["yfov_deg"])   # depth-map width (= render size at 518)
     np.savez(out_dir / "cameras.npz", extrinsic=pred["extrinsic"], intrinsic=pred["intrinsic"],
              cam_centres=pred["cam_centres"], view_ids=np.array(view_ids), intrinsic_pred=intrinsic_pred)
     if cfg.get("fusion", "points") == "tsdf":

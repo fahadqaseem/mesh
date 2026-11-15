@@ -52,7 +52,7 @@ def main() -> None:
     intrinsic_pred = pred["intrinsic"].copy()
     if cfg.get("intrinsics", "predicted") == "known":
         meta = json.loads((Path(args.images).parent / "gt_transform.json").read_text())
-        set_known_intrinsics(pred, meta["size"], meta["yfov_deg"])
+        set_known_intrinsics(pred, pred["depth"].shape[2], meta["yfov_deg"])   # depth-map width (= render size at 518)
     tcfg = dict(cfg.get("tsdf") or {})
     for key in ["voxel_frac", "trunc_vox", "min_views", "min_part", "mv_rel"]:
         if getattr(args, key) is not None:

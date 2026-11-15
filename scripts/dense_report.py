@@ -77,8 +77,8 @@ def section_views(L: list[str]) -> None:
         L += [vi["note"], ""]
     cols = HCOLS + COV
     L += ["**Per shape (pencilpot + 3 set B shapes)**", "",
-          "| shape | views | Chamfer | F1@0.01 | F1@0.02 | recall all @0.01 | recall all @0.02 | NC | coverage (%) | VGGT (s) | peak memory (GB) |",
-          "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
+          "| shape | views | Chamfer | F1@0.01 | F1@0.02 | recall all @0.01 | recall all @0.02 | NC | coverage (%) | VGGT (s) | lowest free memory (%) | worst pressure |",
+          "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
     for s in VIEW_SHAPES:
         for label, suf in VIEWS:
             p, st = pipe(s, suf)["points"], pipe(s, suf)["stats"]
@@ -89,7 +89,8 @@ def section_views(L: list[str]) -> None:
                 info = load(OUT / f"{s}_tdraw" / "points" / "tsdf.json") or info
             L.append(line([s, label] + [f"{p[k]:.3f}" if k != "CD" else f"{p[k]:.2f}" for k, _, _ in HCOLS] +
                           [f"{100 * st['coverage']:.1f}" if st else "", f"{info['vggt_s']:.0f}" if info.get("vggt_s") else "",
-                           f"{info['peak_rss_gb']:.1f}" if info.get("peak_rss_gb") else ""]))
+                           f"{g['min_free']:.0f}" if (g := load(OUT / f"{s}{suf}" / "points" / "mem_guard.json")) else "",
+                           {1: "green", 2: "yellow", 4: "red"}.get(g["worst_level"], "?") if g else ""]))
     L.append("")
     for name, shapes in SETS:
         if not all(pipe(s, "_v12")["points"] for s in shapes):

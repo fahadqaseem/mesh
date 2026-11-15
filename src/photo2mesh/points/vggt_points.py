@@ -12,8 +12,38 @@ import numpy as np
 from ..device import pick_device
 
 
-def run_vggt(image_paths: list[str], use_depth_unprojection: bool = True) -> dict[str, np.ndarray]:
-    """Run VGGT on a list of images of one object/scene.
+def load_images(image_paths: list[str], img_size: int = 518):
+    """VGGT's "crop" preprocessing (vggt.utils.load_fn) with a configurable width (multiple of 14; VGGT uses 518).
+
+    At 518 this calls VGGT's own loader unchanged. Smaller sizes use fewer tokens per image, so more views fit in memory.
+    """
+    import torch
+    from PIL import Image
+    from torchvision import transforms as TF
+    from vggt.utils.load_fn import load_and_preprocess_images
+
+    if img_size == 518:
+        return load_and_preprocess_images(image_paths)
+    if img_size % 14:
+        raise ValueError(f"img_size must be a multiple of 14, got {img_size}")
+    out = []
+    for path in image_paths:
+        img = Image.open(path)
+        if img.mode == "RGBA":
+            img = Image.alpha_composite(Image.new("RGBA", img.size, (255, 255, 255, 255)), img)
+        img = img.convert("RGB")
+        w, h = img.size
+        new_h = round(h * (img_size / w) / 14) * 14
+        x = TF.ToTensor()(img.resize((img_size, new_h), Image.Resampling.BICUBIC))
+        if new_h > img_size:
+            y0 = (new_h - img_size) // 2
+            x = x[:, y0:y0 + img_size, :]
+        out.append(x)
+    return torch.stack(out)
+
+
+def run_vggt(image_paths: list[str], use_depth_unprojection: bool = True, img_size: int = 518) -> dict[str, np.ndarray]:
+    """Run VGGT on a list of images of one object/scene (img_size: input width, see load_images).
 
     Returns a dict of numpy arrays:
         points (S, H, W, 3), conf (S, H, W), colors (S, H, W, 3) in [0, 1], depth (S, H, W),
@@ -25,14 +55,13 @@ def run_vggt(image_paths: list[str], use_depth_unprojection: bool = True) -> dic
     import torch
     from vggt.models.vggt import VGGT
     from vggt.utils.geometry import unproject_depth_map_to_point_map
-    from vggt.utils.load_fn import load_and_preprocess_images
     from vggt.utils.pose_enc import pose_encoding_to_extri_intri
 
     device = pick_device()
     # bf16 only on recent CUDA GPUs; fp32 elsewhere (MPS / CPU)
     use_amp = device == "cuda" and torch.cuda.get_device_capability()[0] >= 8
     model = VGGT.from_pretrained("facebook/VGGT-1B").to(device).eval()
-    images = load_and_preprocess_images(image_paths).to(device)    # (S, 3, H, W) in [0, 1]
+    images = load_images(image_paths, img_size).to(device)    # (S, 3, H, W) in [0, 1]
 
     with torch.no_grad():
         if use_amp:
