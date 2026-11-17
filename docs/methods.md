@@ -256,35 +256,56 @@ checkpoint:** the `num_verts` control needs `denoiser_model.use_proj_cond_on_tem
 `t_embedder.cond_proj` layer (`meshflow_dit.py:722-730`; `meshflow_pipeline.py:119-132`). The config does not set the flag
 (`config.yaml:46-60`), and `model.pth` has no `cond_proj` weights (checked 15 Nov by listing its keys).
 
-**Training loss (paper only; the repo has no training code).** Quoted from arXiv:2606.04621v2 (HTML), via a fetch tool
-that returns excerpts, so **re-check the wording against the PDF before quoting it in a paper**:
+**Training loss (paper only; the repo has no training code).** Quoted from arXiv:2606.04621v2 (HTML downloaded 17 Nov;
+text and equations checked verbatim against the page source, including the LaTeX of Eq. 3-5):
 - MeshVAE (§3.2 "Training Objective", Eq. 3-4): "The VAE is trained to minimize the sum of reconstruction loss
   L_rec and KL regularization loss L_kl"; L = L_mask + L_v + L_n + L_adj + lambda_kl L_kl, with BCE on the vertex mask,
   MSE on valid vertices and normals, and an adjacency loss
   L_adj = L_pos + lambda_neg R_neg/pos L_neg, L_pos = -1/|E| sum_{(i,j) in E} log sigma(d(e_i, e_j) - tau),
-  L_neg = -1/|not E| sum_{(i,j) not in E} log sigma(tau - d(e_i, e_j)). lambda_kl = 1e-3 (supplementary §F).
-  **NOT VERIFIED:** weights of L_v and L_n (not found by the fetch).
+  L_neg = -1/|not E| sum_{(i,j) not in E} log sigma(tau - d(e_i, e_j)). lambda_kl = 1e-3 (arXiv appendix §F; CVPR supplementary §A: "the KL divergence weight is λkl = 10−3").
+  The text calls L_rec "a weighted sum of four distinct components", but Eq. 3 writes L_mask, L_v, L_n and L_adj with no
+  weights (only lambda_kl and, inside L_adj, lambda_neg = 0.01 per the supplementary Section A).
 - DiT (§3.4, Eq. 5): conditional flow matching [Lipman et al., ICLR 2023],
   L_CFM = E_{t, x0, eps} || v_theta(RoPE3D(x_t, c_vox), t) - (eps - x0) ||^2 with x_t = (1 - t) x0 + t eps; logit-normal
   timestep sampling "during the final phase of training".
 
-**The 4,096 vs 32,768 discrepancy** (both quoted with locations):
-- Code and config: the network's input is **4,096** points / tokens: `data.n_verts: 4096` (`config.yaml:2`),
-  `mesh_model.n_samples: 4096`, `num_latents: 4096` (`config.yaml:15`, `:22`), `denoiser_model.input_size: 4096`
-  (`config.yaml:47`); README: "Input meshes should respect the configured vertex budget (`mesh_model.num_latents`,
-  4096 by default)" (`third_party/meshflow/README.md:190`) and `--num_verts 4096` (`README.md:128`).
-- Paper: "we uniformly sampled 32768 points for shape conditioning" and fed them "into a pre-trained shape encoder with
-  an architecture analogous to Shape2VecSet" (arXiv:2606.04621v2, **§3.4 of the main text**). The same section says this
-  was the *initial* design (it "requires prolonged training"); the final model instead "coarsely voxelize[s] the ground
-  truth vertices during training to provide coarse shape priors in the RoPE embeddings", with "a voxel resolution of 32".
-- So the two are consistent if the 32,768-point Shape2VecSet encoder is the abandoned variant: the released model
-  conditions on 4,096 voxelised points (training: GT vertices; our use: surface points). Its VAE encoder takes the mesh's
-  own padded vertices with features (`meshflow_vae.py:682-716`, `point_feats_type`, `config.yaml:16-20`), not a
-  surface sample.
-- **NOT VERIFIED:** "supplementary Section A". The arXiv v2 HTML has no Section A (its appendix starts at §F), and the CVF
-  page (https://openaccess.thecvf.com/content/CVPR2026/html/Li_MeshFlow_Efficient_Artistic_Mesh_Generation_via_MeshVAE_and_Flow-based_Diffusion_CVPR_2026_paper.html)
-  refused automated access (HTTP 403), so the separate CVPR supplementary could not be read. If Section A there says
-  32,768, it most likely describes the same §3.4 variant; this needs a manual check.
+**The 4,096 vs 32,768 discrepancy: the paper's model and the released checkpoint differ.** Sources, quoted exactly:
+- **CVPR 2026 supplementary, Section A "Additional Implementation Details"** (`MeshFlow_CVPR2026_supplemental.pdf`, page
+  1 of 5; local copy in `docs/papers/`, not in git):
+  - Data: "We utilize a proprietary dataset of approximately 600k high-quality 3D models from professional artists."
+  - Shape condition: "We uniformly sampled 32,768 points for shape conditioning, which were then fed into a similarly
+    pre-trained shape encoder with a structure similar to Shape2VecSet [7] to obtain 2048 tokens. The resulting tokens
+    and the vertex count serve as conditional inputs for our Diffusion Transformer."
+  - DiT: "The DiT uses the same standard transformer with 18 blocks and a 1024 hidden size, amounting to 427M
+    parameters."
+  - RoPE: "The RoPE can be applied to either the center coordinates or the indices of the encoded point set. [...] The
+    results presented in the paper therefore employ indices for RoPE."
+- **Main paper, arXiv:2606.04621v2 §3.4 "The Choice of Shape Information Injection"** (HTML, downloaded 17 Nov and
+  read verbatim; the CVPR camera-ready main paper was not available to compare): "In our initial design, we uniformly
+  sampled 32768 points for shape conditioning and then fed these points into a pre-trained shape encoder with an
+  architecture analogous to Shape2VecSet [51], yielding 2048 shape tokens. We then leveraged cross-attention (CA) to
+  condition our DiT on these tokens and further added a vertex count condition in the tilmestep embedding. We found
+  that although this paradigm facilitates straightforward inference, yet it requires prolonged training to ensure good
+  model performance." It then describes the GT-vertex RoPE scheme: "we coarsely voxelize the ground truth vertices
+  during training to provide coarse shape priors in the RoPE embeddings. Ultimately, we found that a voxel resolution
+  of 32 strikes a reasonable trade-off between having an artist-like topology and keeping shape details." The paper
+  calls the 32,768-point encoder its "initial design"; it does not say in so many words that the encoder was dropped.
+- **arXiv v2 appendix §F** (the arXiv counterpart of Section A) does not contain the 32,768-point sentence and gives a
+  different DiT: "The DiT uses the same standard transformer with 16 blocks and a 1536 hidden size, amounting to 895M
+  parameters." The main text §4.1 of the same arXiv version says "18 blocks and a 1024 hidden layer size, amounting to
+  427M parameters".
+- **Released code and checkpoint:** the DiT has `layers: 16`, `width: 1536` (`ckpt/meshflow/meshflow/config.yaml:51-52`)
+  and 895.6M parameters (counted from `model.pth`, 17 Nov), i.e. the arXiv §F model, not the 427M model of the CVPR
+  supplementary and §4.1. `model.pth` holds only `mesh_model` (the MeshVAE) and `denoiser_model` (the DiT): **no
+  point-cloud shape encoder, no 2048-token cross-attention condition and no trained vertex-count layer** (see vertex
+  count above). The input is 4,096 points (`data.n_verts: 4096`, `config.yaml:2`; `denoiser_model.input_size: 4096`,
+  `config.yaml:47`; README: "Input meshes should respect the configured vertex budget (`mesh_model.num_latents`, 4096
+  by default)", `third_party/meshflow/README.md:190`), voxelised at 32^3 for the RoPE positions.
+- **Plainly: the model described in the CVPR supplementary (32,768 uniform points -> Shape2VecSet-like encoder -> 2048
+  tokens, plus the vertex count as a condition, 427M-parameter DiT, trained on ~600k proprietary artist meshes) is not
+  the released checkpoint** (4,096 points voxelised at 32^3 as RoPE positions, no encoder, no vertex-count input,
+  895.6M-parameter DiT). Numbers in the paper therefore do not directly describe the model we run; we can only cite the
+  paper for the method family and the released code for what we use.
 - Also in the paper (§3.4): "We also provide the number of vertices concatenated with the time embedding". The released
   checkpoint does not have this input (see vertex count above).
 
@@ -325,5 +346,5 @@ MeshFlow's exact inverse; never ICP).
 | Kernel points | sample N(mu, Sigma), per-axis trunc 2 sigma | - | opacity >= 0.5, max axis <= 0.05 x size, pick prob. proportional to opacity, seed 0, ~83 pts per Gaussian at 1M | yes |
 | Gap fill | distance band to nearest TSDF point | - | 3% < d / extent <= 10%, no GT | yes (band chosen on pencilpot) |
 | 4K selection | MeshFlow's randperm (default) or FPS | Qi et al. 2017 (FPS, PointNet++) | bsphere normalise, 4,096, seed 42 (global torch RNG, MPS) | randomness MeshFlow's; seed ours; FPS ours (not default) |
-| Mesher | MeshFlow (CVPR 2026) | Li et al. 2026 | 32^3 voxel RoPE, 28 steps, guidance 1.0, tau 0.6, cycles <= 20, V <= 4,096 | guidance 1.0 and device split ours |
+| Mesher | MeshFlow (CVPR 2026) | Li et al. 2026 | 32^3 voxel RoPE, 28 steps, guidance 1.0, tau 0.6, cycles <= 20, V <= 4,096 | guidance 1.0 and device split ours; released checkpoint differs from the paper's model (section 8) |
 | Metrics | protocol v1 | MeshFlow evaluation (CD/HD x100, 5k) | [-0.5, 0.5] by GT bbox; CD/HD 5k; F1/NC 100k at 0.005/0.01/0.02 | yes (protocol), CD definition MeshFlow's |

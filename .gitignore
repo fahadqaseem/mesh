@@ -27,3 +27,4 @@ venv/
 # Meeting decks live outside the repo: ../Zhong Meetings Presentations
 docs/slides/
 .history/
+docs/papers/
