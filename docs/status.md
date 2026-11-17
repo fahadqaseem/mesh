@@ -1,8 +1,20 @@
 # Status
 
-Snapshot, rewritten at the end of every work block. Last updated: 2026-11-16 22:45.
+Snapshot, rewritten at the end of every work block. Last updated: 2026-11-17 01:30.
 
 ## Latest
+- **Friday follow-ups (17 Nov), `docs/results/2026-11-17_conf_ablation.md`; `docs/methods.pdf` exported for attaching.**
+  - Alignment check (ICP vs GT, diagnostic only): camera centres fit to 0.7% of the orbit radius; rigid ICP lowers set B
+    outliers > 0.02 only from 23.9% to 17.3%; ICP with scale to 7.0%, but its scale (0.970, < 1 on 12 of 12) absorbs an
+    outward surface offset, not a camera error. The fused VGGT depth pixels already sit outside the GT (median +0.012
+    of the object size, 80% outside); the TSDF cloud +0.0065. **The outliers are a VGGT depth bias (~1% too short), not
+    alignment.**
+  - Confidence ablation: conf_percentile 30 and 10 fuse exactly the same pixels as 50 on 11 of 12 shapes (the
+    percentile over all pixels is the background value 1.0; VGGT's own foreground decides). Fusing every foreground
+    pixel (no erosion) fills 4% of the GT gap and worsens Chamfer by 0.20; gap fill fills 46%. **Extra depth pixels do not
+    fill the gaps; the gaps are occluded surface** (99.4% of gap points lie behind fused depth in some view).
+  - Corrections: the 18 Nov outlier report said gap points sit on low-confidence filtered pixels (wrong, fixed);
+    methods.md now says the percentile is inert.
 - **Block of 16 Nov (for Prof. Zhong, due Fri 20 Nov 1 PM): all four tasks done.**
   - Task A, `docs/methods.md`: every stage from the code with file:line references; NOT VERIFIED where code cannot show it
     (Open3D's marching cubes and TSDF weighting, msplat internals, set B selection script, MeshFlow's training loss and
@@ -81,12 +93,15 @@ Dense output is the default since 15 Nov (1M points). "Recall all" = share of th
 
 ## Next 3 steps
 1. Before Fri 20 Nov: Fahad checks the CVPR supplementary (Section A) and the MeshFlow loss wording against the PDF.
-2. Gap-fill outliers: free-space test against VGGT's unfiltered (low-confidence) depth, and 16-view clouds as the base.
-3. 12/16 views: pilot TSDF min_views 2 on pencilpot (floaters from single views), then set A/B.
+2. GT-free depth-scale correction (one factor per scene from multi-view depth agreement) to remove the outward offset.
+3. 12/16 views with TSDF min_views 2 (the gaps are unseen surface; more views is the lever), then gap fill on them.
 
 ## Open questions
-- **Gap fill: keep, filter or drop?** Better Chamfer and recall, +4 points of outliers; the outliers sit in regions with
-  no depth evidence, so filters cannot remove them without removing the gains. For Prof. Zhong.
+- **Gap fill: keep, filter or drop?** Better Chamfer and recall, +4 points of outliers; the outliers sit in occluded
+  regions no view sees, so filters cannot remove them without removing the gains, and lower confidence thresholds do
+  not help (17 Nov). For Prof. Zhong.
+- **Correct VGGT's depth bias?** A GT-free per-scene depth scale is cheap to try; it would change the points stage
+  (and every number since 9 Nov), so it needs his OK before becoming the default.
 - **16 views as the default?** Safe on the laptop and better on F1, NC and recall, worse on Chamfer until the
   floaters are handled. For Prof. Zhong; my plan is to pilot min_views first.
 - **Points default = TSDF + gap fill?** Better cloud on every main metric except F1@0.01 (-0.004), but it needs the

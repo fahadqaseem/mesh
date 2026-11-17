@@ -3,12 +3,14 @@
 One entry per run. Newest on top. Claude: append here after every run, and keep "Next up" current.
 
 ## Next up
-1. [ ] Mon 16 Nov with Prof. Zhong: show the dense gap-filled cloud and the views result; ask about the open questions.
-2. [ ] 12/16 views: pilot TSDF min_views 2 on pencilpot (floaters from single views), then set A/B; then the gap fill
+1. [ ] Fri 20 Nov with Prof. Zhong: methods.pdf, equal count, outliers, seeded 4K, ICP check and conf ablation.
+2. [ ] GT-free depth-scale correction: one factor per scene that maximises multi-view depth agreement; check it
+       removes the +0.0065 outward offset (17 Nov).
+3. [ ] 12/16 views: pilot TSDF min_views 2 on pencilpot (floaters from single views), then set A/B; then the gap fill
        on the 16-view clouds.
-3. [ ] ShapeNet / Toys4K: Fahad requests access, then `scripts/prep_dataset.py --n 3` on the real files.
-4. [ ] Finer gap points (snap the kernel points to a local surface fit).
-5. [ ] Unseen surface (the rig never sees the underside): views from below.
+4. [ ] ShapeNet / Toys4K: Fahad requests access, then `scripts/prep_dataset.py --n 3` on the real files.
+5. [ ] Finer gap points (snap the kernel points to a local surface fit).
+6. [ ] Unseen surface (the rig never sees the underside): views from below.
 
 Done: env + pytest (11-06); MeshFlow weights downloaded (11-07); 8 Thingi10K shapes rendered v1 (Y-up, 2 rings x 8,
 procedural texture); VGGT on all 8 scenes (16 views); alignment stage (camera Umeyama + ICP); point-cloud evaluation;
@@ -32,6 +34,20 @@ Next:
 ```
 
 ## Runs
+
+### 2026-11-17  Friday follow-ups: ICP alignment check, confidence ablation (set B)
+Goal: split TSDF outliers into alignment vs depth error; test whether lower VGGT confidence thresholds fill the gaps.
+Input: set B (12), 8 views; VGGT rerun per shape under scripts/mem_guard.py (raw.npz deleted after scoring; one abort
+  on the first try because I started headless Chrome at the same time, rerun alone: 12/12 ok, never red).
+Config: ICP: scripts/icp_check.py (trimmed ICP vs GT, rigid and with scale; diagnostic only). Ablation:
+  scripts/conf_ablation.sh, points.conf_percentile 50 / 30 / 10 and 10 with fg_erode 0; 1M points each.
+Result: ICP rigid: outliers > 0.02 23.9% -> 17.3%, with scale -> 7.0% (scale 0.970, < 1 on 12/12); camera RMS 0.7% of
+  the orbit radius. Fused VGGT pixels sit outside the GT (median +0.012, 80% outside); TSDF cloud +0.0065.
+  conf 30 = conf 10 = conf 50 on 11/12 shapes (50th percentile over all pixels is the background value 1.0); set B
+  Chamfer 5.58 / 5.57 / 5.57; no erosion 5.78. GT gap filled: conf 10 2%, all foreground 4%, gap fill 46%.
+Notes: outliers come from a VGGT depth bias (~1% too short), not alignment; gaps are occluded surface (99.4% of gap
+  points behind fused depth in some view), so no pixel filter reaches them. Corrected the 18 Nov outlier report and
+  methods.md. docs/methods.pdf exported. Report: docs/results/2026-11-17_conf_ablation.md.
 
 ### 2026-11-15  dense_default + views_8_12_16 + gapfill figure  (block of 15 Nov)
 Goal: (1) dense output (1M) as the default, gap fill at the same density; (2) 12 and 16 VGGT views on the laptop;

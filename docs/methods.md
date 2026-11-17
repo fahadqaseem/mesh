@@ -67,7 +67,11 @@ calls `vggt.utils.load_fn.load_and_preprocess_images` unchanged, `:27-28`). fp32
 **Pixel filter before fusion** (`src/photo2mesh/points/filter.py:75-95`, called from `fusion.py:101`):
 1. Confidence: keep pixels with conf >= the 50th percentile **over all pixels of all views together** and conf > 1.0
    (`filter.py:8-16`; `configs/default.yaml:21-22`). VGGT confidences are 1 + exp(x) >= 1 and background sits at
-   exactly 1.0, hence the strict bound (`filter.py:11-13`).
+   exactly 1.0, hence the strict bound (`filter.py:11-13`). **In practice the percentile does nothing on our renders**
+   (measured 17 Nov, `docs/results/2026-11-17_conf_ablation.md`): VGGT's foreground (conf > 1.0) covers less than
+   half of the image on 11 of 12 set B shapes, so the 50th percentile over all pixels is the background value 1.0
+   and the binding rule is conf > 1.0, i.e. every pixel VGGT itself calls foreground. conf_percentile 30 or 10
+   fuses exactly the same pixels.
 2. Silhouette erosion: the foreground mask (conf > 1.0) is eroded by 2 px to drop the object's rim (`fg_erode: 2`,
    `configs/default.yaml:16`; `filter.py:84-87`, `:43-44`). The depth-edge test itself is off (`edge_rel: 0.0`,
    `configs/default.yaml:14`).

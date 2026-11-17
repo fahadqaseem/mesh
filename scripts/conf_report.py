@@ -126,16 +126,17 @@ def main() -> None:
           "deleted). Variants change only the pixel filter before TSDF fusion (`src/photo2mesh/points/filter.py:75-95`); "
           "everything else default, 1M points. Pixel accuracy: every fused pixel back-projected (known focal), moved by "
           "the run's camera alignment, exact distance to the GT surface.", "",
-          "| variant | fused pixels (% of VGGT foreground) | pixels > 0.02 off (%) | pixels added vs conf 50 | added pixels > 0.02 off (%) |",
-          "|---|---:|---:|---:|---:|"]
+          "| variant | fused pixels (% of VGGT foreground) | pixels > 0.02 off (%) | median signed offset of pixels | pixels added vs conf 50 | added pixels > 0.02 off (%) |",
+          "|---|---:|---:|---:|---:|---:|"]
     vlabel = {"c50": "conf 50 (default)", "c30": "conf 30", "c10": "conf 10", "c10e0": "conf 10, no erosion"}
     for v, lbl in vlabel.items():
         fr = [100 * pix[s]["variants"][v]["fused_over_fg"] for s in shapes]
         o2 = [pix[s]["variants"][v]["all"]["out@0.02"] for s in shapes]
         na = [pix[s]["variants"][v]["added_vs_c50"]["n"] for s in shapes]
         ao = [pix[s]["variants"][v]["added_vs_c50"]["out@0.02"] for s in shapes if pix[s]["variants"][v]["added_vs_c50"]["n"]]
-        L.append(f"| {lbl} | {ms(fr, 1)} | {ms(o2, 1)} | {np.mean(na):,.0f} (non-zero on {sum(x > 0 for x in na)} of {n}) | "
-                 f"{ms(ao, 1) if len(ao) > 1 else '-'} |")
+        sg = [pix[s]["variants"][v]["all"]["median_signed"] for s in shapes]
+        acell = ms(ao, 1) if len(ao) > 1 else f"{ao[0]:.1f} (1 shape)" if ao else "-"
+        L.append(f"| {lbl} | {ms(fr, 1)} | {ms(o2, 1)} | {ms(sg, 4)} | {np.mean(na):,.0f} (non-zero on {sum(x > 0 for x in na)} of {n}) | {acell} |")
     L += ["", "| shape | VGGT foreground (% of image) | conf 50th / 30th / 10th percentile over all pixels | fused pixels: conf 50 / 30 / 10 / 10 no erosion |",
           "|---|---:|---|---|"]
     for s in shapes:
