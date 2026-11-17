@@ -109,9 +109,10 @@ def main() -> None:
          "reaches the network. FPS spreads the points evenly over the cloud, but it also seeks out the cloud's extremes, "
          "so stray points are more likely to be kept. **Inputs** (same VGGT pass, same alignment, no rerun of points): the TSDF cloud (`_tex_v3`, 200k); "
          "the TSDF cloud plus 200k Gaussian-kernel samples (`_gsk`, opacity-weighted), a simple union of 400k points. "
-         "The current random-pick rows are the existing `_tex_v3` meshes (seeds 42, 7, 123). Note that the input "
-         "size changes how many random numbers the pick consumes, so the same seed gives a different generation noise "
-         "across inputs; the 3 seeds on set A are what separates the input effect from that.", ""]
+         "The current random-pick rows are the existing `_tex_v3` meshes (seeds 42, 7, 123). The generation noise for a "
+         "given seed is the same across inputs: MeshFlow draws it from its own generator seeded with the seed "
+         "(`meshflow_pipeline.py:371`), separate from the global RNG that picks the 4,096 points (corrected 16 Nov; an "
+         "earlier version of this note said the opposite). The 3 seeds on set A measure seed-to-seed spread.", ""]
 
     L += ["## 1. What MeshFlow sees", "",
           "`scripts/meshflow_input_stats.py`: the 4,096 points after MeshFlow's normalisation, voxelised at 32^3 as in "
