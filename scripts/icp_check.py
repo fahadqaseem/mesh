@@ -32,8 +32,10 @@ def outliers(p: np.ndarray, gt) -> dict:
     gt_n = gt.copy()
     gt_n.vertices = (gt.vertices - centre) * scale
     d = surface_distance((p - centre) * scale, gt_n)
+    from conf_report import signed_offset
+    sub = np.random.default_rng(0).choice(len(p), min(100_000, len(p)), replace=False)
     return {"out@0.01": float(100 * (d > 0.01).mean()), "out@0.02": float(100 * (d > 0.02).mean()),
-            "dist_median": float(np.median(d))}
+            "dist_median": float(np.median(d)), "signed_offset": signed_offset(((p[sub] - centre) * scale), gt_n)}
 
 
 def check(shape: str, suffix: str) -> dict:

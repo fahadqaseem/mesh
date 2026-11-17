@@ -4,8 +4,8 @@ One entry per run. Newest on top. Claude: append here after every run, and keep 
 
 ## Next up
 1. [ ] Fri 20 Nov with Prof. Zhong: methods.pdf, equal count, outliers, seeded 4K, ICP check and conf ablation.
-2. [ ] GT-free depth-scale correction: one factor per scene that maximises multi-view depth agreement; check it
-       removes the +0.0065 outward offset (17 Nov).
+2. [ ] Joint GT-free fit of depth scale and focal (VGGT's focal is 4-11% short; 18 Nov depth scale alone was mixed).
+       Also 12 views over three rings (4 at 50, 4 at 20, 4 at -10 deg) on set B.
 3. [ ] 12/16 views: pilot TSDF min_views 2 on pencilpot (floaters from single views), then set A/B; then the gap fill
        on the 16-view clouds.
 4. [ ] ShapeNet / Toys4K: Fahad requests access, then `scripts/prep_dataset.py --n 3` on the real files.
@@ -34,6 +34,21 @@ Next:
 ```
 
 ## Runs
+
+### 2026-11-18  Depth scale correction (GT-free) and low views (set B); supplementary Section A
+Goal: remove VGGT's outward depth bias without GT; test whether low views fill the unseen gaps.
+Input: set B (12), 8 views; pencilpot for tuning only. VGGT reruns under scripts/mem_guard.py (36 runs: 12 default with
+  raw.npz kept until fitted, 24 low-view; worst pressure yellow, lowest free 19%, no abort). raw.npz deleted.
+Config: scripts/depth_scale.py (global k, eps 0.005 chosen on pencilpot; per-view k also), tsdf_points.py --depth-scale;
+  scripts/low_views_run.sh (-10 deg ring rendered into data/scenes_low; low A = 20 + -10 deg, low B = 50 + 20 + -10 deg).
+Result: depth scale, set B: k 0.995-1.037; Chamfer 5.58 -> 5.80 (global) / 5.91 (per view), F1@0.01 0.469 -> 0.500,
+  outliers > 0.01 49.8 -> 45.6%, > 0.02 23.9 -> 24.8%, offset +0.0065 -> -0.0022; ICP with scale bound 4.68 / 7.0%.
+  Low views: GT gap filled 36% (A) / 27% (B) vs 22% for 16 views; recall all @0.02 0.682 -> 0.712 / 0.725; Chamfer
+  5.83 / 5.64.
+Notes: depth fit overcorrects and breaks thin parts in the TSDF (thingi_77949); not adopted. Low views help undersides
+  but cost the top with only 8 views. One report run scored thingi_1146183's low-view clouds while VGGT ran (CPU only,
+  no memory issue). methods.md section 8 now quotes supplementary Section A; paper model != released checkpoint.
+  Report: docs/results/2026-11-18_depth_scale.md.
 
 ### 2026-11-17  Friday follow-ups: ICP alignment check, confidence ablation (set B)
 Goal: split TSDF outliers into alignment vs depth error; test whether lower VGGT confidence thresholds fill the gaps.

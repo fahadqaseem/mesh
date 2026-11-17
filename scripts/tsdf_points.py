@@ -41,6 +41,9 @@ def main() -> None:
     ap.add_argument("--min-part", type=float, default=None, help="drop pieces under this fraction of the area")
     ap.add_argument("--mv-rel", type=float, default=None, help="multi-view pixel filter before fusion (0 = off)")
     ap.add_argument("--n", type=int, default=None, help="points to sample (default: points.tsdf.n_points)")
+    ap.add_argument("--depth-scale", default=None,
+                    help="JSON with per-view depth scales {'k': [...]} (scripts/depth_scale.py); multiplies VGGT depth "
+                         "before the known-focal unprojection and fusion (needs intrinsics: known)")
     args = ap.parse_args()
     cfg = yaml.safe_load(open(args.config))["points"]
     for kv in args.set:
@@ -50,6 +53,12 @@ def main() -> None:
     pred = dict(np.load(Path("outputs") / args.raw_from / "points" / "raw.npz"))
     view_ids = pred.pop("view_ids")
     intrinsic_pred = pred["intrinsic"].copy()
+    if args.depth_scale:
+        if cfg.get("intrinsics", "predicted") != "known":
+            raise SystemExit("--depth-scale needs intrinsics: known (the points are re-unprojected from the scaled depth)")
+        k = np.asarray(json.loads(Path(args.depth_scale).read_text())["k"], np.float32).reshape(-1)
+        k = np.broadcast_to(k, (len(pred["depth"]),))
+        pred["depth"] = pred["depth"] * k[:, None, None]
     if cfg.get("intrinsics", "predicted") == "known":
         meta = json.loads((Path(args.images).parent / "gt_transform.json").read_text())
         set_known_intrinsics(pred, pred["depth"].shape[2], meta["yfov_deg"])   # depth-map width (= render size at 518)
@@ -68,7 +77,7 @@ def main() -> None:
     mesh.export(out / "tsdf_mesh.ply")
     np.savez(out / "cameras.npz", extrinsic=pred["extrinsic"], intrinsic=pred["intrinsic"],
              cam_centres=pred["cam_centres"], view_ids=view_ids, intrinsic_pred=intrinsic_pred)
-    info = {"raw_from": args.raw_from, "config": cfg, **tinfo,
+    info = {"raw_from": args.raw_from, "config": cfg, "depth_scale": args.depth_scale, **tinfo,
             "peak_rss_gb": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1e9}
     (out / "tsdf.json").write_text(json.dumps(info, indent=2))
     print(f"[tsdf] {info['pixels_fused']:,} pixels, voxel {info['voxel']:.5f} trunc {info['trunc']:.5f} -> "

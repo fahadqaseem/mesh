@@ -1,8 +1,20 @@
 # Status
 
-Snapshot, rewritten at the end of every work block. Last updated: 2026-11-17 01:30.
+Snapshot, rewritten at the end of every work block. Last updated: 2026-11-17 14:30.
 
 ## Latest
+- **Follow-ups of 17 Nov (afternoon), `docs/results/2026-11-18_depth_scale.md`:**
+  - MeshFlow supplementary Section A read and quoted in `docs/methods.md` section 8 (PDF regenerated; the PDF of the
+    paper is local only, `docs/papers/` is gitignored). The paper's model (32,768 points -> Shape2VecSet-like encoder ->
+    2048 tokens + vertex count, 427M DiT, ~600k artist meshes) is not the released checkpoint (4,096 voxelised points as
+    RoPE positions, no encoder, no vertex-count input, 895.6M DiT = arXiv appendix §F). The main paper calls the
+    32,768-point encoder its "initial design" but never says it was dropped; the earlier "abandoned" wording is removed.
+    The loss equations were checked verbatim against the arXiv source.
+  - GT-free depth scale (multi-view agreement, tuned on pencilpot): confirms depth too short (k up to 1.037) but
+    overcorrects; set B Chamfer 5.58 -> 5.80, F1@0.01 +0.03, outliers > 0.01 -4.2, > 0.02 +0.8. Not adopted. ICP bound:
+    4.68. Suspect next: VGGT's focal (4-11% short) vs its depth.
+  - Low views (-10 deg ring): fill 27-36% of the GT gap (16 usual views: 22%), recall all @0.02 +0.03 / +0.04, but 8
+    views cannot cover top and bottom: mean Chamfer +0.06 / +0.25, big swings per shape.
 - **Friday follow-ups (17 Nov), `docs/results/2026-11-17_conf_ablation.md`; `docs/methods.pdf` exported for attaching.**
   - Alignment check (ICP vs GT, diagnostic only): camera centres fit to 0.7% of the orbit radius; rigid ICP lowers set B
     outliers > 0.02 only from 23.9% to 17.3%; ICP with scale to 7.0%, but its scale (0.970, < 1 on 12 of 12) absorbs an
@@ -19,8 +31,8 @@ Snapshot, rewritten at the end of every work block. Last updated: 2026-11-17 01:
   - Task A, `docs/methods.md`: every stage from the code with file:line references; NOT VERIFIED where code cannot show it
     (Open3D's marching cubes and TSDF weighting, msplat internals, set B selection script, MeshFlow's training loss and
     the CVPR supplementary). The 4,096 vs 32,768 discrepancy: the 32,768 points are in the paper's main text (§3.4,
-    arXiv v2) as the abandoned initial Shape2VecSet design; the released model conditions on 4,096 points voxelised at
-    32^3. "Supplementary Section A" could not be read (CVF blocks automated access): **Fahad, please check it by hand.**
+    arXiv v2) as the "initial design"; the released model conditions on 4,096 points voxelised at 32^3. (Superseded
+    17 Nov afternoon: Section A read, see above.)
     Also corrected: MeshFlow's generation noise does not depend on the input pick (13 Nov report said it did).
   - Task B, `docs/results/2026-11-17_equal_count.md`: at exactly 1M points each, gap fill keeps its gains (set B Chamfer
     5.33 vs 5.58, recall all @0.02 0.825 vs 0.682) but adds outliers on every shape (> 0.02: 24.0% to 28.0%). The TSDF
@@ -92,16 +104,20 @@ Dense output is the default since 15 Nov (1M points). "Recall all" = share of th
   either way, so 1M vs 200k does not change its input distribution); upper bound on clean GT points 2.93 / 0.979 / 265.
 
 ## Next 3 steps
-1. Before Fri 20 Nov: Fahad checks the CVPR supplementary (Section A) and the MeshFlow loss wording against the PDF.
-2. GT-free depth-scale correction (one factor per scene from multi-view depth agreement) to remove the outward offset.
-3. 12/16 views with TSDF min_views 2 (the gaps are unseen surface; more views is the lever), then gap fill on them.
+1. Joint GT-free fit of depth scale and focal (VGGT's own focal is 4-11% short on every shape).
+2. 12 views over three rings (4 at 50, 4 at 20, 4 at -10 deg) on set B: top and bottom both seen.
+3. Fri 20 Nov meeting: methods.pdf, equal count, outliers, seeded 4K, ICP / conf ablation, depth scale, low views.
 
 ## Open questions
 - **Gap fill: keep, filter or drop?** Better Chamfer and recall, +4 points of outliers; the outliers sit in occluded
   regions no view sees, so filters cannot remove them without removing the gains, and lower confidence thresholds do
   not help (17 Nov). For Prof. Zhong.
-- **Correct VGGT's depth bias?** A GT-free per-scene depth scale is cheap to try; it would change the points stage
-  (and every number since 9 Nov), so it needs his OK before becoming the default.
+- **Correct VGGT's depth bias?** A pure depth scale (18 Nov) is mixed and not adopted; a joint depth + focal fit is
+  next. Any correction would change every points number since 9 Nov, so it needs his OK before becoming the default.
+- **Camera rig:** low views reach the undersides that no filter or Gaussian can; should the test rig get a third ring
+  (12 views) even though it costs VGGT memory? For Prof. Zhong.
+- **Paper vs release (MeshFlow):** our MeshFlow numbers are for the released checkpoint, which differs from the paper's
+  model; say so whenever we compare with the paper's tables.
 - **16 views as the default?** Safe on the laptop and better on F1, NC and recall, worse on Chamfer until the
   floaters are handled. For Prof. Zhong; my plan is to pilot min_views first.
 - **Points default = TSDF + gap fill?** Better cloud on every main metric except F1@0.01 (-0.004), but it needs the

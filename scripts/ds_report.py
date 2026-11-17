@@ -1,0 +1,207 @@
+"""Report: GT-free depth scale correction and low views (set B). -> docs/results/2026-11-18_depth_scale.md
+
+Usage: python scripts/ds_report.py [--out docs/results/2026-11-18_depth_scale.md]
+Inputs (all produced earlier, no recomputation of clouds):
+  outputs/pencilpot_299291_ds*/ (tuning on pencilpot; scripts/depth_scale.py + scripts/ds_score.py)
+  outputs/<s>_{dense,dsg,dsv}/eval/{equal_count,signed_offset}.json, outputs/<s>_ds/points/depth_scale_*.json
+  outputs/icp_check/icp_check_B_offset.json (ICP with scale, the GT-based upper bound; scripts/icp_check.py)
+  outputs/<s>_{lowA,lowB,v16}/align/points_aligned.ply (scored here: equal_count.score at 1M points if the cloud has
+  1M points, plus signed offset and the GT gap test of scripts/conf_report.py)
+Hand-written blocks between <!-- tag --> markers survive a rerun.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+from pathlib import Path
+
+import numpy as np
+from scipy.spatial import cKDTree
+
+from photo2mesh.eval.metrics import sample_surface
+from photo2mesh.io import load_points_ply
+
+sys.path.insert(0, str(Path(__file__).parent))
+from conf_report import cloud, normalised, signed_offset  # noqa: E402
+from equal_count import score  # noqa: E402
+from make_points_queue import DEV, SET_B  # noqa: E402
+
+COLS = [("CD", "Chamfer", 2), ("F1@0.01", "F1@0.01", 3), ("R_all@0.02", "recall all @0.02", 3),
+        ("out@0.01", "outliers > 0.01 (%)", 1), ("out@0.02", "outliers > 0.02 (%)", 1)]
+O = Path("outputs")
+
+
+def ms(v, d: int) -> str:
+    v = np.asarray(v, float)
+    return f"{v.mean():.{d}f} ± {v.std(ddof=1):.{d}f}"
+
+
+def load(shape: str, suf: str) -> dict:
+    r = json.loads((O / f"{shape}{suf}" / "eval" / "equal_count.json").read_text())
+    r["offset"] = json.loads((O / f"{shape}{suf}" / "eval" / "signed_offset.json").read_text())["signed_offset"]
+    return r
+
+
+def score_new(shape: str, suf: str) -> dict:
+    """Score a cloud that has no equal_count.json yet (1M points sampled if it has more)."""
+    f = O / f"{shape}{suf}" / "eval" / "equal_count.json"
+    if f.exists() and (O / f"{shape}{suf}" / "eval" / "signed_offset.json").exists():
+        return load(shape, suf)
+    n = len(load_points_ply(O / f"{shape}{suf}" / "align" / "points_aligned.ply")["points"])
+    r = score(shape, suf, min(n, 1_000_000), 0)
+    _, g, c, s = normalised(shape)
+    p = cloud(shape, suf, c, s)
+    off = signed_offset(p[np.random.default_rng(0).choice(len(p), 100_000, replace=False)], g)
+    (O / f"{shape}{suf}" / "eval" / "signed_offset.json").write_text(json.dumps({"signed_offset": off}))
+    return load(shape, suf)
+
+
+def gap_filled(shape: str, base: str, others: list[str]) -> dict:
+    """% of the GT surface > 0.02 from the base cloud, and the share of that gap each other cloud brings within 0.02."""
+    _, g, c, s = normalised(shape)
+    gt = sample_surface(g, 100_000)[0]
+    d0 = cKDTree(cloud(shape, base, c, s)).query(gt, distance_upper_bound=0.05)[0]
+    hole = d0 > 0.02
+    out = {"gap": float(100 * hole.mean())}
+    for o in others:
+        d = cKDTree(cloud(shape, o, c, s)).query(gt[hole], distance_upper_bound=0.05)[0]
+        out[o] = float(100 * (d <= 0.02).mean())
+    return out
+
+
+def table(rows: list[tuple[str, list[dict]]], extra: str = "offset") -> list[str]:
+    L = ["| points | " + " | ".join(c[1] for c in COLS) + " | signed offset |", "|---|" + "---:|" * (len(COLS) + 1)]
+    for lbl, rs in rows:
+        L.append(f"| {lbl} | " + " | ".join(ms([r[k] for r in rs], d) for k, _, d in COLS) +
+                 f" | {ms([r[extra] for r in rs], 4)} |")
+    return L
+
+
+def paired(base: list[dict], new: list[dict], lbl: str) -> str:
+    parts = []
+    for k, l, d in COLS + [("abs_offset", "|signed offset|", 4)]:
+        get = (lambda r: abs(r["offset"])) if k == "abs_offset" else (lambda r, k=k: r[k])
+        dv = np.array([get(b2) - get(b1) for b1, b2 in zip(base, new)])
+        better = (dv < 0).sum() if k in ("CD", "abs_offset") or k.startswith("out") else (dv > 0).sum()
+        parts.append(f"{l} {dv.mean():+.{d}f} (better on {better} of {len(dv)})")
+    return f"- {lbl}: " + "; ".join(parts) + "."
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--out", default="docs/results/2026-11-18_depth_scale.md")
+    args = ap.parse_args()
+    B = SET_B
+    base = [load(s, "_dense") for s in B]
+    dsg = [load(s, "_dsg") for s in B]
+    dsv = [load(s, "_dsv") for s in B]
+    icp = {r["shape"]: r for r in json.loads((O / "icp_check" / "icp_check_B_offset.json").read_text())}
+    icp_rows = [{**icp[s]["sim3"], "offset": icp[s]["sim3"]["signed_offset"]} for s in B]
+    kg = {s: json.loads((O / f"{s}_ds" / "points" / "depth_scale_global.json").read_text()) for s in B}
+    kv = {s: json.loads((O / f"{s}_ds" / "points" / "depth_scale_view.json").read_text()) for s in B}
+
+    L = ["# GT-free depth scale correction and low views (set B)", "",
+         "Fahad Qaseem Khawar, 18 Nov 2026. Generated by `scripts/ds_report.py`. Set B = 12 new shapes (clean test set); "
+         "pencilpot (dev) is used only for tuning and is in no mean. Mean ± std over shapes. Clouds: exactly 1M points, "
+         "protocol v1 + outliers (exact distance to the GT triangles, `scripts/equal_count.py`); signed offset = median "
+         "distance along the GT face normal of 100k points (> 0 = outside). Normalised frame: GT extent 1.", "",
+         "<!-- summary -->", "<!-- /summary -->", "",
+         "## 1. Depth scale correction", "",
+         "**Method (no GT anywhere in the fit;** `src/photo2mesh/points/depth_scale.py`, `scripts/depth_scale.py`**).** "
+         "VGGT's depth maps are multiplied by k (one per scene, or k_i per view) with VGGT's cameras and the known focal "
+         "fixed. For 20,000 fused pixels per view (the pixels the TSDF uses, default filter), each pixel of view i is "
+         "back-projected with k_i and projected into every other view j; where it lands on a fused pixel of j, the relative "
+         "depth residual r = (k_j d_j - z_j) / z_j is read with bilinear interpolation. Cost = mean of min(|r|, eps) over all "
+         "ordered view pairs, so pixels that see different surfaces (occlusion) cost eps whatever k is. Global k: grid "
+         "0.90-1.10 (step 0.005, then 0.0005). Per view: coordinate descent from the global k (3 sweeps, ±0.03). Then the "
+         "default TSDF (`scripts/tsdf_points.py --depth-scale`), 1M points, camera alignment as protocol v1. About 23 s "
+         "per shape on the CPU. Unit test: a synthetic sphere with depth scaled by 0.97 is recovered to 0.1% "
+         "(`tests/test_depth_scale.py`).", "",
+         "**Tuning on pencilpot only** (eps, and global vs per view; GT used only to score the dev shape):", "",
+         "| pencilpot | k | Chamfer | F1@0.01 | recall all @0.02 | outliers > 0.01 (%) | outliers > 0.02 (%) | signed offset |",
+         "|---|---|---:|---:|---:|---:|---:|---:|"]
+    pp = DEV
+    for suf, lbl, k in [("_ds", "default (no scale)", "1"),
+                        ("_ds_global_e0.005", "fit, global, eps 0.005 (chosen)", None),
+                        ("_ds_view_e0.005", "fit, per view, eps 0.005", None),
+                        ("_ds_global_e0.01", "fit, global, eps 0.01", None), ("_ds_view_e0.01", "fit, per view, eps 0.01", None),
+                        ("_ds_global_e0.02", "fit, global, eps 0.02", None), ("_ds_view_e0.02", "fit, per view, eps 0.02", None),
+                        ("_ds_fixed_1.005", "fixed k (GT probe)", "1.005"), ("_ds_fixed_1.01", "fixed k (GT probe)", "1.01"),
+                        ("_ds_fixed_1.0125", "fixed k (GT probe)", "1.0125"), ("_ds_fixed_1.015", "fixed k (GT probe)", "1.015"),
+                        ("_ds_fixed_1.02", "fixed k (GT probe)", "1.02")]:
+        r = score_new(pp, suf)
+        if k is None:
+            m = re.search(r"_(global|view)_e([\d.]+)", suf)
+            kk = json.loads((O / f"{pp}_ds" / "points" / f"ds_{m.group(1)}_e{m.group(2)}.json").read_text())["k"]
+            k = f"{kk:.4f}" if isinstance(kk, float) else f"{np.mean(kk):.4f} (mean)"
+        L.append(f"| {lbl} | {k} | {r['CD']:.2f} | {r['F1@0.01']:.3f} | {r['R_all@0.02']:.3f} | {r['out@0.01']:.1f} | "
+                 f"{r['out@0.02']:.1f} | {r['offset']:+.4f} |")
+    L += ["", "<!-- tune -->", "<!-- /tune -->", "", "**Set B (12 shapes)**", ""]
+    L += table([("TSDF, current default", base), ("TSDF, depth x global k (GT-free)", dsg),
+                ("TSDF, depth x per-view k (GT-free)", dsv), ("TSDF + ICP with scale vs GT (upper bound, NOT protocol v1)", icp_rows)])
+    L += ["", "Paired per shape against the current default:", "", paired(base, dsg, "global k"),
+          paired(base, dsv, "per-view k"), paired(base, icp_rows, "ICP with scale (upper bound)"), "",
+          "**Per shape** (fitted k; Chamfer / F1@0.01 / outliers > 0.02 % / signed offset)", "",
+          "| shape | global k | per-view k (min-max) | ICP scale | default | global k | per-view k | ICP with scale |",
+          "|---|---:|---:|---:|---:|---:|---:|---:|"]
+    cell = lambda r: f"{r['CD']:.2f} / {r['F1@0.01']:.3f} / {r['out@0.02']:.1f} / {r['offset']:+.4f}"
+    for s, b, g, v, i in zip(B, base, dsg, dsv, icp_rows):
+        L.append(f"| {s} | {kg[s]['k']:.4f} | {min(kv[s]['k']):.3f}-{max(kv[s]['k']):.3f} | {icp[s]['sim3']['step_scale']:.3f} | "
+                 f"{cell(b)} | {cell(g)} | {cell(v)} | {cell(i)} |")
+    ks = np.array([kg[s]["k"] for s in B])
+    inv = np.array([1 / icp[s]["sim3"]["step_scale"] for s in B])
+    L += ["", f"Correlation of the fitted global k with 1 / ICP scale over the 12 shapes: {np.corrcoef(ks, inv)[0, 1]:.2f}.", "",
+          "<!-- interp1 -->", "<!-- /interp1 -->", ""]
+
+    # 2. low views
+    low = [s for s in B if all((O / f"{s}{x}" / "align" / "points_aligned.ply").exists() for x in ("_lowA", "_lowB"))]
+    if low:
+        has16 = all((O / f"{s}_v16" / "align" / "points_aligned.ply").exists() for s in low)
+        sufs = ["_lowA", "_lowB"] + (["_v16"] if has16 else [])
+        R = {(s, x): score_new(s, x) for s in low for x in sufs}
+        G = {s: gap_filled(s, "_dense", sufs) for s in low}
+        L += ["## 2. Low views", "",
+              "A third ring at **-10 deg** elevation (8 views, radius 3, same azimuths as the 20 deg ring) was rendered next to "
+              "the usual rings (`scripts/low_views_run.sh` -> `data/scenes_low/<s>`, 24 views; the first 16 are pixel-identical "
+              "to the original renders). Two 8-view sets that include low views, against the current 8 (4 at 20 deg + 4 at "
+              "50 deg, ids 0, 2, 4, 6, 9, 11, 13, 15):",
+              "- **low A**: 4 at 20 deg (azimuth 0/90/180/270) + 4 at -10 deg (45/135/225/315): the 50 deg ring swapped for -10 deg.",
+              "- **low B**: 2 at 50 deg (67.5/247.5) + 4 at 20 deg + 2 at -10 deg (135/315).",
+              "Everything else default (VGGT under the memory guard, known focal, TSDF, 1M points, camera alignment).", "",
+              f"**Set B ({len(low)} shapes)**", ""]
+        rows = [("current 8 views (20 + 50 deg)", [load(s, "_dense") for s in low]),
+                ("low A: 20 + -10 deg", [R[(s, "_lowA")] for s in low]), ("low B: 50 + 20 + -10 deg", [R[(s, "_lowB")] for s in low])]
+        if has16:
+            rows.append(("16 views (20 + 50 deg, 15 Nov; reference)", [R[(s, "_v16")] for s in low]))
+        L += table(rows)
+        L += ["", "| views | GT gap of the current 8-view cloud filled (%) |", "|---|---:|"]
+        for x, lbl in [("_lowA", "low A"), ("_lowB", "low B")] + ([("_v16", "16 views")] if has16 else []):
+            L.append(f"| {lbl} | {ms([G[s][x] for s in low], 1)} |")
+        L += ["", f"GT gap = GT surface points farther than 0.02 from the current 8-view cloud: {ms([G[s]['gap'] for s in low], 1)}% "
+              "of the surface.", "", "Paired per shape against the current 8 views:", "",
+              paired(rows[0][1], rows[1][1], "low A"), paired(rows[0][1], rows[2][1], "low B")]
+        if has16:
+            L.append(paired(rows[0][1], rows[3][1], "16 views"))
+        L += ["", "**Per shape** (Chamfer / recall all @0.02 / outliers > 0.02 % / gap filled %)", "",
+              "| shape | current 8 | low A | low B |" + (" 16 views |" if has16 else ""), "|---|---:|---:|---:|" + ("---:|" if has16 else "")]
+        for s in low:
+            b = load(s, "_dense")
+            L.append(f"| {s} | {b['CD']:.2f} / {b['R_all@0.02']:.3f} / {b['out@0.02']:.1f} / - | " + " | ".join(
+                f"{R[(s, x)]['CD']:.2f} / {R[(s, x)]['R_all@0.02']:.3f} / {R[(s, x)]['out@0.02']:.1f} / {G[s][x]:.0f}" for x in sufs) + " |")
+        L += ["", "<!-- interp2 -->", "<!-- /interp2 -->", ""]
+
+    text = "\n".join(L) + "\n"
+    if Path(args.out).exists():
+        old = Path(args.out).read_text()
+        for tag in ["summary", "tune", "interp1", "interp2"]:
+            m = re.search(f"<!-- {tag} -->.*?<!-- /{tag} -->", old, re.S)
+            if m:
+                text = re.sub(f"<!-- {tag} -->.*?<!-- /{tag} -->", lambda _: m.group(0), text, flags=re.S)
+    Path(args.out).write_text(text)
+    print(f"[report] {args.out}")
+
+
+if __name__ == "__main__":
+    main()
