@@ -1,8 +1,24 @@
 # Status
 
-Snapshot, rewritten at the end of every work block. Last updated: 2026-11-15 00:40.
+Snapshot, rewritten at the end of every work block. Last updated: 2026-11-16 22:45.
 
 ## Latest
+- **Block of 16 Nov (for Prof. Zhong, due Fri 20 Nov 1 PM): all four tasks done.**
+  - Task A, `docs/methods.md`: every stage from the code with file:line references; NOT VERIFIED where code cannot show it
+    (Open3D's marching cubes and TSDF weighting, msplat internals, set B selection script, MeshFlow's training loss and
+    the CVPR supplementary). The 4,096 vs 32,768 discrepancy: the 32,768 points are in the paper's main text (§3.4,
+    arXiv v2) as the abandoned initial Shape2VecSet design; the released model conditions on 4,096 points voxelised at
+    32^3. "Supplementary Section A" could not be read (CVF blocks automated access): **Fahad, please check it by hand.**
+    Also corrected: MeshFlow's generation noise does not depend on the input pick (13 Nov report said it did).
+  - Task B, `docs/results/2026-11-17_equal_count.md`: at exactly 1M points each, gap fill keeps its gains (set B Chamfer
+    5.33 vs 5.58, recall all @0.02 0.825 vs 0.682) but adds outliers on every shape (> 0.02: 24.0% to 28.0%). The TSDF
+    cloud itself has 24% of its points beyond 0.02.
+  - Task C, `docs/results/2026-11-18_outliers.md` + figure: 78% of gap points are > 0.02 off the GT; no Gaussian property
+    separates them (AUC <= 0.62); 91.5% lie where no view has fused depth (the filtered low-confidence pixels), so
+    multi-view checks see little. Free space + silhouette is the only filter that improves both (set B outliers -0.7
+    points, Chamfer -0.05); opacity / scale thresholds only delete points.
+  - Task D, `docs/results/2026-11-19_seeded_4k.md`: seeded random, FPS and curvature-weighted FPS give the same mesh
+    accuracy (set B Chamfer 6.20 / 6.20 / 6.47); FPS variants give ~3,900 vertices; seeded random is the clean baseline.
 - **Block of 15 Nov done** (`docs/results/2026-11-15_dense.md`, summary on top):
   - Dense output (1M points) is the default; the dense gap-filled cloud is the best cloud: set B Chamfer 5.31 (was
     5.61), recall all @0.02 0.827 (was 0.677), coverage 85% (was 76%).
@@ -64,11 +80,13 @@ Dense output is the default since 15 Nov (1M points). "Recall all" = share of th
   either way, so 1M vs 200k does not change its input distribution); upper bound on clean GT points 2.93 / 0.979 / 265.
 
 ## Next 3 steps
-1. Meeting Mon 16 Nov: the three numbers (Chamfer 5.31, coverage 85%, 16-view F1@0.01 0.55) and the open questions.
-2. 12/16 views: pilot TSDF min_views 2 on pencilpot, then set A/B, then the gap fill on 16-view clouds.
-3. ShapeNet / Toys4K once access is granted.
+1. Before Fri 20 Nov: Fahad checks the CVPR supplementary (Section A) and the MeshFlow loss wording against the PDF.
+2. Gap-fill outliers: free-space test against VGGT's unfiltered (low-confidence) depth, and 16-view clouds as the base.
+3. 12/16 views: pilot TSDF min_views 2 on pencilpot (floaters from single views), then set A/B.
 
 ## Open questions
+- **Gap fill: keep, filter or drop?** Better Chamfer and recall, +4 points of outliers; the outliers sit in regions with
+  no depth evidence, so filters cannot remove them without removing the gains. For Prof. Zhong.
 - **16 views as the default?** Safe on the laptop and better on F1, NC and recall, worse on Chamfer until the
   floaters are handled. For Prof. Zhong; my plan is to pilot min_views first.
 - **Points default = TSDF + gap fill?** Better cloud on every main metric except F1@0.01 (-0.004), but it needs the
