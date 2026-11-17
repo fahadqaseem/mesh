@@ -107,7 +107,8 @@ def use_point_head(pred: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
     return pred
 
 
-def set_known_intrinsics(pred: dict[str, np.ndarray], size: int, yfov_deg: float) -> dict[str, np.ndarray]:
+def set_known_intrinsics(pred: dict[str, np.ndarray], size: int, yfov_deg: float,
+                         focal_scale: float = 1.0) -> dict[str, np.ndarray]:
     """Calibrated setting (in place): replace VGGT's focal by the known one and re-unproject the depth maps.
 
     For our renders the focal follows from the image size and vertical field of view (as EXIF would give for real
@@ -116,7 +117,7 @@ def set_known_intrinsics(pred: dict[str, np.ndarray], size: int, yfov_deg: float
     from vggt.utils.geometry import unproject_depth_map_to_point_map
 
     k = pred["intrinsic"].copy()
-    f = (size / 2.0) / np.tan(np.deg2rad(yfov_deg) / 2.0)
+    f = focal_scale * (size / 2.0) / np.tan(np.deg2rad(yfov_deg) / 2.0)   # focal_scale != 1 only for the focal fit
     k[:, 0, 0] = k[:, 1, 1] = f
     k[:, 0, 2] = k[:, 1, 2] = size / 2.0
     pred["intrinsic"] = k

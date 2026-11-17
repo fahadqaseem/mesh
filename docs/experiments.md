@@ -4,8 +4,7 @@ One entry per run. Newest on top. Claude: append here after every run, and keep 
 
 ## Next up
 1. [ ] Fri 20 Nov with Prof. Zhong: methods.pdf, equal count, outliers, seeded 4K, ICP check and conf ablation.
-2. [ ] Joint GT-free fit of depth scale and focal (VGGT's focal is 4-11% short; 18 Nov depth scale alone was mixed).
-       Also 12 views over three rings (4 at 50, 4 at 20, 4 at -10 deg) on set B.
+2. [ ] If Prof. Zhong agrees: 12 views over three rings as the test rig; rerun set A and the gap fill on it.
 3. [ ] 12/16 views: pilot TSDF min_views 2 on pencilpot (floaters from single views), then set A/B; then the gap fill
        on the 16-view clouds.
 4. [ ] ShapeNet / Toys4K: Fahad requests access, then `scripts/prep_dataset.py --n 3` on the real files.
@@ -34,6 +33,18 @@ Next:
 ```
 
 ## Runs
+
+### 2026-11-19  12 views over three rings; GT-free joint fit of depth scale and focal (set B)
+Goal: cover top and bottom with one rig; test whether a joint depth + focal fit removes VGGT's bias without GT.
+Input: set B (12); data/scenes_low rig (20 / 50 / -10 deg rings). 12-view ids 0,2,4,6,9,11,13,15,17,19,21,23.
+  VGGT under scripts/mem_guard.py: 12 twelve-view runs (one red abort on thingi_94668 after swap reached ~6 GB, rerun
+  alone ok; lowest free 10%) + 12 default reruns with raw.npz (deleted after fitting).
+Config: scripts/views_focal_run.sh; scripts/depth_scale.py --joint (k and phi, eps 0.005, tuned on pencilpot);
+  tsdf_points.py --depth-scale --focal-scale; reference intrinsics=predicted.
+Result: 12 views / 3 rings: Chamfer 5.29 (default 5.58, 16 views 5.88), recall all @0.02 0.797, F1@0.01 0.570,
+  outliers > 0.02 17.4%, gap filled 40%. Joint fit: Chamfer 7.91, outliers > 0.02 52.6%; phi = VGGT's own focal.
+Notes: placement beats view count; the focal cannot be fitted from VGGT's own outputs. Report:
+  docs/results/2026-11-19_views_focal.md.
 
 ### 2026-11-18  Depth scale correction (GT-free) and low views (set B); supplementary Section A
 Goal: remove VGGT's outward depth bias without GT; test whether low views fill the unseen gaps.

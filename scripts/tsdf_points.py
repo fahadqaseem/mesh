@@ -44,6 +44,8 @@ def main() -> None:
     ap.add_argument("--depth-scale", default=None,
                     help="JSON with per-view depth scales {'k': [...]} (scripts/depth_scale.py); multiplies VGGT depth "
                          "before the known-focal unprojection and fusion (needs intrinsics: known)")
+    ap.add_argument("--focal-scale", default=None,
+                    help="JSON with {'phi': f} (scripts/depth_scale.py --joint): use f x the known focal (needs intrinsics: known)")
     args = ap.parse_args()
     cfg = yaml.safe_load(open(args.config))["points"]
     for kv in args.set:
@@ -61,7 +63,8 @@ def main() -> None:
         pred["depth"] = pred["depth"] * k[:, None, None]
     if cfg.get("intrinsics", "predicted") == "known":
         meta = json.loads((Path(args.images).parent / "gt_transform.json").read_text())
-        set_known_intrinsics(pred, pred["depth"].shape[2], meta["yfov_deg"])   # depth-map width (= render size at 518)
+        phi = float(json.loads(Path(args.focal_scale).read_text())["phi"]) if args.focal_scale else 1.0
+        set_known_intrinsics(pred, pred["depth"].shape[2], meta["yfov_deg"], phi)   # depth-map width (= render size at 518)
     tcfg = dict(cfg.get("tsdf") or {})
     for key in ["voxel_frac", "trunc_vox", "min_views", "min_part", "mv_rel"]:
         if getattr(args, key) is not None:
@@ -77,7 +80,7 @@ def main() -> None:
     mesh.export(out / "tsdf_mesh.ply")
     np.savez(out / "cameras.npz", extrinsic=pred["extrinsic"], intrinsic=pred["intrinsic"],
              cam_centres=pred["cam_centres"], view_ids=view_ids, intrinsic_pred=intrinsic_pred)
-    info = {"raw_from": args.raw_from, "config": cfg, "depth_scale": args.depth_scale, **tinfo,
+    info = {"raw_from": args.raw_from, "config": cfg, "depth_scale": args.depth_scale, "focal_scale": args.focal_scale, **tinfo,
             "peak_rss_gb": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1e9}
     (out / "tsdf.json").write_text(json.dumps(info, indent=2))
     print(f"[tsdf] {info['pixels_fused']:,} pixels, voxel {info['voxel']:.5f} trunc {info['trunc']:.5f} -> "

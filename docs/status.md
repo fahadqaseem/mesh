@@ -1,8 +1,14 @@
 # Status
 
-Snapshot, rewritten at the end of every work block. Last updated: 2026-11-17 14:30.
+Snapshot, rewritten at the end of every work block. Last updated: 2026-11-17 18:30.
 
 ## Latest
+- **19 Nov block (run 17 Nov evening), `docs/results/2026-11-19_views_focal.md`:**
+  - 12 views over three rings (4 at 50, 4 at 20, 4 at -10 deg): set B Chamfer 5.29 (default 5.58, 16 views 5.88),
+    recall all @0.02 0.797 (12/12 better), F1@0.01 0.570, outliers > 0.02 17.4%, 40% of the current gap filled.
+    Best photo-only cloud so far; laptop-safe one scene at a time (one guard abort after swap built up, rerun ok).
+  - GT-free joint fit of depth scale and focal: fails (Chamfer 7.91, 0/12 better). The fit always returns VGGT's own
+    focal, a self-consistent but 4-11% short focal; it cannot be corrected from VGGT's outputs. Known focal stays.
 - **Follow-ups of 17 Nov (afternoon), `docs/results/2026-11-18_depth_scale.md`:**
   - MeshFlow supplementary Section A read and quoted in `docs/methods.md` section 8 (PDF regenerated; the PDF of the
     paper is local only, `docs/papers/` is gitignored). The paper's model (32,768 points -> Shape2VecSet-like encoder ->
@@ -104,18 +110,19 @@ Dense output is the default since 15 Nov (1M points). "Recall all" = share of th
   either way, so 1M vs 200k does not change its input distribution); upper bound on clean GT points 2.93 / 0.979 / 265.
 
 ## Next 3 steps
-1. Joint GT-free fit of depth scale and focal (VGGT's own focal is 4-11% short on every shape).
-2. 12 views over three rings (4 at 50, 4 at 20, 4 at -10 deg) on set B: top and bottom both seen.
-3. Fri 20 Nov meeting: methods.pdf, equal count, outliers, seeded 4K, ICP / conf ablation, depth scale, low views.
+1. Fri 20 Nov meeting: methods.pdf, equal count, outliers, seeded 4K, ICP / conf ablation, depth scale, low views,
+   12 views over three rings, focal fit.
+2. If agreed: 12 views over three rings as the rig; rerun set A, the gap fill and MeshFlow on it.
+3. Depth bias: only fixable with a depth model that takes the known focal as input (VGGT has none); look for one.
 
 ## Open questions
 - **Gap fill: keep, filter or drop?** Better Chamfer and recall, +4 points of outliers; the outliers sit in occluded
   regions no view sees, so filters cannot remove them without removing the gains, and lower confidence thresholds do
   not help (17 Nov). For Prof. Zhong.
-- **Correct VGGT's depth bias?** A pure depth scale (18 Nov) is mixed and not adopted; a joint depth + focal fit is
-  next. Any correction would change every points number since 9 Nov, so it needs his OK before becoming the default.
-- **Camera rig:** low views reach the undersides that no filter or Gaussian can; should the test rig get a third ring
-  (12 views) even though it costs VGGT memory? For Prof. Zhong.
+- **Correct VGGT's depth bias?** A pure depth scale (18 Nov) is mixed; a GT-free focal fit is impossible (19 Nov, it
+  returns VGGT's own focal). A real fix needs a depth model that accepts the known focal. Worth looking for one?
+- **Camera rig:** 12 views over three rings is the best cloud (Chamfer 5.29, recall 0.797) and fits on the laptop one
+  scene at a time. Make it the test rig? It changes the data, so every earlier number would need a rerun. For Prof. Zhong.
 - **Paper vs release (MeshFlow):** our MeshFlow numbers are for the released checkpoint, which differs from the paper's
   model; say so whenever we compare with the paper's tables.
 - **16 views as the default?** Safe on the laptop and better on F1, NC and recall, worse on Chamfer until the

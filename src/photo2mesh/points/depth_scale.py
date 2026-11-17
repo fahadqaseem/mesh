@@ -22,6 +22,7 @@ class DepthAgreement:
         self.R, self.t = np.asarray(extrinsic)[:, :, :3].astype(np.float64), np.asarray(extrinsic)[:, :, 3].astype(np.float64)
         self.K = np.asarray(intrinsic, np.float64)
         self.eps = eps
+        self.phi = 1.0                                      # focal factor: f = phi x the given focal (all views)
         rng = np.random.default_rng(seed)
         self.cam_pts = []                                   # per view: (n, 3) camera-frame points at k = 1
         for i in range(len(depth)):
@@ -35,11 +36,16 @@ class DepthAgreement:
     def residuals(self, k: np.ndarray, i: int, j: int) -> np.ndarray:
         """Relative depth residuals of view i's pixels seen in view j (only where j has a kept pixel)."""
         s, h, w = self.depth.shape
-        xw = (k[i] * self.cam_pts[i] - self.t[i]) @ self.R[i]          # world = R^T (x_cam - t)
+        p = self.cam_pts[i] * k[i]
+        if self.phi != 1.0:                                 # focal phi * f: x, y = d (u - c) / (phi f)
+            p = p * np.array([1 / self.phi, 1 / self.phi, 1.0])
+        xw = (p - self.t[i]) @ self.R[i]                    # world = R^T (x_cam - t)
         xc = xw @ self.R[j].T + self.t[j]
         z = xc[:, 2]
         ok = z > 1e-9
-        uv = (xc[ok] / z[ok, None]) @ self.K[j].T
+        kj = self.K[j].copy()
+        kj[:2, :2] *= self.phi
+        uv = (xc[ok] / z[ok, None]) @ kj.T
         u0, v0 = np.floor(uv[:, 0]).astype(int), np.floor(uv[:, 1]).astype(int)
         ins = (u0 >= 0) & (u0 < w - 1) & (v0 >= 0) & (v0 < h - 1)
         u0, v0, fu, fv, zz = u0[ins], v0[ins], uv[ins, 0] - u0[ins], uv[ins, 1] - v0[ins], z[ok][ins]
@@ -92,3 +98,27 @@ def fit_per_view(agr: DepthAgreement, k_init: float, sweeps: int = 3, half: floa
             k[i], _, _ = _scan(f, k[i] - half, k[i] + half, 0.0025)
             k[i], _, _ = _scan(f, k[i] - 0.0025, k[i] + 0.0025, 0.0005)
     return {"k": k.tolist(), "cost": float(agr.cost(k))}
+
+
+def fit_joint(agr: DepthAgreement, k_range: tuple[float, float] = (0.94, 1.08),
+              phi_range: tuple[float, float] = (0.88, 1.06)) -> dict:
+    """One depth scale k and one focal factor phi (f = phi x known focal) for all views: 2D grid (step 0.01), then a
+    fine grid (0.0025) around the best. The cameras (poses) stay as VGGT predicted them."""
+    s = len(agr.depth)
+
+    def f(k: float, phi: float) -> float:
+        agr.phi = phi
+        return agr.cost(np.full(s, k))
+
+    def grid(ks, ps):
+        vals = np.array([[f(k, p) for p in ps] for k in ks])
+        a, b = np.unravel_index(np.argmin(vals), vals.shape)
+        return float(ks[a]), float(ps[b]), vals
+
+    ks, ps = np.arange(k_range[0], k_range[1] + 1e-9, 0.01), np.arange(phi_range[0], phi_range[1] + 1e-9, 0.01)
+    k0, p0, coarse = grid(ks, ps)
+    k1, p1, _ = grid(np.arange(k0 - 0.01, k0 + 0.01 + 1e-9, 0.0025), np.arange(p0 - 0.01, p0 + 0.01 + 1e-9, 0.0025))
+    out = {"k": k1, "phi": p1, "cost": float(f(k1, p1)), "cost_at_1": float(f(1.0, 1.0)),
+           "k_grid": ks.tolist(), "phi_grid": ps.tolist(), "coarse": coarse.tolist()}
+    agr.phi = 1.0
+    return out

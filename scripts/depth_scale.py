@@ -5,7 +5,8 @@ Reads outputs/<run>/points/raw.npz (VGGT, run_points.py --keep-raw) and only wha
 depth maps and cameras, the known focal, and the default pixel filter (the pixels the TSDF fuses, filter.py via
 fusion.py:101). No GT is read. Fits one scale for all views and, from it, one per view
 (src/photo2mesh/points/depth_scale.py). Writes outputs/<run>/points/depth_scale_global.json and depth_scale_view.json,
-each {"k": ...} for scripts/tsdf_points.py --depth-scale.
+each {"k": ...} for scripts/tsdf_points.py --depth-scale. With --joint: depth_scale_joint.json {"k", "phi"}
+(depth scale and focal factor fitted together) for --depth-scale and --focal-scale.
 """
 from __future__ import annotations
 
@@ -17,7 +18,7 @@ from pathlib import Path
 import numpy as np
 import yaml
 
-from photo2mesh.points.depth_scale import DepthAgreement, fit_global, fit_per_view
+from photo2mesh.points.depth_scale import DepthAgreement, fit_global, fit_joint, fit_per_view
 from photo2mesh.points.filter import filter_pixels
 from photo2mesh.points.fusion import TSDF_DEFAULTS
 from photo2mesh.points.vggt_points import set_known_intrinsics
@@ -29,6 +30,9 @@ def main() -> None:
     ap.add_argument("--scene", required=True, help="only gt_transform.json's yfov is read (the known focal)")
     ap.add_argument("--eps", type=float, default=0.005, help="truncation of the relative depth residual (0.005 chosen on pencilpot, 17 Nov)")
     ap.add_argument("--n", type=int, default=20_000, help="pixels sampled per view")
+    ap.add_argument("--joint", action="store_true",
+                    help="fit one depth scale k and one focal factor phi together -> depth_scale_joint.json {k, phi}")
+    ap.add_argument("--tag", default="", help="suffix for the output file name (tuning runs)")
     args = ap.parse_args()
     t0 = time.time()
     cfg = yaml.safe_load(open("configs/default.yaml"))["points"]
@@ -40,6 +44,13 @@ def main() -> None:
     t = {**TSDF_DEFAULTS, **(cfg.get("tsdf") or {})}
     keep = filter_pixels(pred, {**cfg, "mv_rel": t["mv_rel"]}).reshape(pred["depth"].shape)
     agr = DepthAgreement(pred["depth"], keep, pred["extrinsic"], pred["intrinsic"], n_per_view=args.n, eps=args.eps)
+    if args.joint:
+        j = fit_joint(agr)
+        meta = {"eps": args.eps, "n_per_view": args.n, "seconds": round(time.time() - t0, 1)}
+        (out / f"depth_scale_joint{args.tag}.json").write_text(json.dumps({**j, **meta}, indent=2))
+        print(f"[depth-scale] {args.run}: joint k {j['k']:.4f} phi {j['phi']:.4f} (cost {j['cost_at_1']:.5f} -> "
+              f"{j['cost']:.5f}); {meta['seconds']} s")
+        return
     g = fit_global(agr)
     v = fit_per_view(agr, g["k"])
     meta = {"eps": args.eps, "n_per_view": args.n, "seconds": round(time.time() - t0, 1)}

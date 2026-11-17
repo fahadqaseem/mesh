@@ -41,3 +41,13 @@ def test_per_view_scale_recovered():
     agr = DepthAgreement(depth / true[:, None, None], keep, ext, K, n_per_view=3000)
     k = np.array(fit_per_view(agr, fit_global(agr)["k"])["k"])
     assert np.abs(k - true).max() < 0.01
+
+
+def test_joint_scale_and_focal_recovered():
+    from photo2mesh.points.depth_scale import fit_joint
+    depth, keep, ext, K = sphere_views(size=96)
+    wrong = K.copy()
+    wrong[:, :2, :2] /= 0.95                 # the fit is given a focal 1/0.95 too long; the truth is phi = 0.95
+    fit = fit_joint(DepthAgreement(depth * 0.97, keep, ext, wrong, n_per_view=3000))
+    assert abs(fit["phi"] - 0.95) < 0.01
+    assert abs(fit["k"] - 1 / 0.97) < 0.01
