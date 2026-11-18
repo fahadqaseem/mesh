@@ -1,7 +1,8 @@
 import numpy as np
 
 from photo2mesh.points.gaussians import (gaussian_centres, qvec_to_rotmat, read_colmap_images, read_ply_vertices,
-                                         rotmat_to_qvec, sample_kernels, write_colmap)
+                                         rotmat_to_qvec, sample_kernels, sample_kernels_counts,
+                                         write_colmap)
 
 
 def _random_rotation(rng):
@@ -63,3 +64,18 @@ def test_kernel_sampling_follows_covariance():
     assert np.isclose(sd[1], 0.1 * 0.88, rtol=0.05) and np.isclose(sd[0], 0.01 * 0.88, rtol=0.05)  # truncated N: 0.88
     assert np.abs(pts).max(0)[1] <= 0.2 + 1e-9
     assert np.allclose(np.abs(nrm[:, 2]), 1)                # shortest axis = z
+
+
+def test_kernel_sampling_by_counts_and_disk():
+    fields = [(n, "<f4") for n in ["x", "y", "z", "opacity", "scale_0", "scale_1", "scale_2",
+                                   "rot_0", "rot_1", "rot_2", "rot_3"]]
+    v = np.zeros(2, dtype=fields)
+    v["x"] = [0.0, 10.0]
+    v["scale_0"], v["scale_1"], v["scale_2"] = np.log(0.1), np.log(0.05), np.log(0.01)
+    v["rot_0"] = 1.0                                         # identity: shortest axis = z
+    pts, nrm, pick = sample_kernels_counts(v, np.array([300, 700]))
+    assert len(pts) == 1000 and (pick == 0).sum() == 300
+    assert np.allclose(pts[pick == 1].mean(0), [10, 0, 0], atol=0.02)
+    d, _, _ = sample_kernels_counts(v, np.array([500, 0]), disk=True)
+    assert np.allclose(d[:, 2], 0) and d[:, 0].std() > 0.05   # on the disk of the two largest axes
+    assert np.allclose(np.abs(nrm[:, 2]), 1)

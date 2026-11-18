@@ -3,7 +3,8 @@
 One entry per run. Newest on top. Claude: append here after every run, and keep "Next up" current.
 
 ## Next up
-1. [ ] Fri 20 Nov with Prof. Zhong: methods.pdf, equal count, outliers, seeded 4K, ICP check and conf ablation.
+1. [ ] Fri 20 Nov with Prof. Zhong: methods.pdf, equal count, outliers, seeded 4K, ICP check, conf ablation, depth scale,
+       views / focal, and his five follow-ups (docs/results/2026-11-19_zhong_followups.md).
 2. [ ] If Prof. Zhong agrees: 12 views over three rings as the test rig; rerun set A and the gap fill on it.
 3. [ ] 12/16 views: pilot TSDF min_views 2 on pencilpot (floaters from single views), then set A/B; then the gap fill
        on the 16-view clouds.
@@ -33,6 +34,32 @@ Next:
 ```
 
 ## Runs
+
+### 2026-11-18  Prof. Zhong's follow-ups of 17 Nov (five items; set A 7 + set B 12, no tuning)
+Goal: answer the 17 Nov email: point map vs TSDF; Gaussian thresholds by GT region; points per Gaussian; MeshFlow
+  paper vs release; evaluation consistency.
+Input: set A + set B, 8 default views. VGGT rerun on all 19 (scripts/pm_run.sh, under scripts/mem_guard.py, raw kept
+  then deleted): 19/19 ok, worst pressure yellow once, no abort; cameras and sim3 identical to <s>_dense on 19/19.
+Config: default. Scored at exactly 1M points, seed 0 (with replacement for the unfused clouds, 0.42M-1.07M pixels).
+Result:
+  1. Set B, (a) point head / (b) unprojected depth (known focal) / (c) TSDF: Chamfer 8.12 / 6.07 / 5.58; outliers
+     > 0.02 56.3 / 31.2 / 23.9%; recall all @0.02 0.430 / 0.740 / 0.682; NC 0.832 / 0.826 / 0.809; offset +0.018 /
+     +0.011 / +0.007. Fusion: Chamfer 12/12 better, outliers 12/12 better, recall 0/12.
+  2. Gap points' precision by region (12 opacity x size settings): thin 2-5%, boundary 15-25%, rest 19-32%,
+     unobserved 29-41%. 83% of the unobserved region is TSDF gap. Size <= 0.01: precision +5, fill 46 -> 17%. Current
+     o 0.5 / a 0.05 has the best Chamfer (5.32). o 0.5 / a 0.05 reproduces the dense gap fill exactly (64,779 points
+     on thingi_94668).
+  3. Mean points per Gaussian = n / N = 1M / ~12k (mean over shapes 83). Equal totals: opacity / fixed k / area / disk
+     Chamfer 5.80 / 5.73 / 5.73 / 5.83; precision 64.0 / 65.5 / 58.4 / 64.3%; NN CV 0.68 / 0.67 / 0.56 / 0.79; gap filled
+     45.7 / 45.4 / 50.6 / 41.0% (set B, k = 83). Outlier rate: 28% (largest axis 0.5-1%) -> 71% (3-5%); 40% (0 views
+     see the centre) -> 0.6% (8 views). 87% of gap points come from centres no view sees.
+  4. docs/meshflow_public_vs_paper.md.
+  5. docs/eval_protocol.md section 6 (scripts/eval_audit.py): 297 point scores consistent, six labelled exceptions;
+     the 19 Nov views report header wording fixed (the TSDF clouds have 1M points for any view count).
+Notes / what I saw: fusion trades coverage for consistency; no Gaussian threshold rescues the gap points, which are
+  guesses in unseen surface; the allocation rule matters little (fixed k marginally best).
+Report: docs/results/2026-11-19_zhong_followups.md (+ figures 2026-11-19_regions.png, 2026-11-19_outliers_vs_gaussian.png).
+Next: Friday meeting.
 
 ### 2026-11-19  12 views over three rings; GT-free joint fit of depth scale and focal (set B)
 Goal: cover top and bottom with one rig; test whether a joint depth + focal fit removes VGGT's bias without GT.

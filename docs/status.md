@@ -1,8 +1,19 @@
 # Status
 
-Snapshot, rewritten at the end of every work block. Last updated: 2026-11-17 18:30.
+Snapshot, rewritten at the end of every work block. Last updated: 2026-11-18.
 
 ## Latest
+- **Prof. Zhong's five follow-ups (email 17 Nov), `docs/results/2026-11-19_zhong_followups.md`:**
+  1. Point map vs TSDF (same pixels, same alignment, 1M points): TSDF fusion improves consistency (set B Chamfer
+     6.07 -> 5.58 and outliers > 0.02 31% -> 24%, both 12/12; offset halved) but costs coverage (recall all 0.740 ->
+     0.682, 0/12). VGGT's point head is worst everywhere (Chamfer 8.12; it carries VGGT's short focal).
+  2. Gap points by GT region: precision thin 2-5%, boundary 15-25%, unobserved 29-41%; the TSDF gap is mostly unseen
+     surface (83% of the unobserved region). No opacity / size threshold helps; current thresholds have the best Chamfer.
+  3. ~83 points per Gaussian = n / N (1M / ~12k), whatever the weights. Allocation rule barely matters at equal totals;
+     fixed k marginally best, area weighting most uniform but least precise; outliers grow with Gaussian size and fall
+     with the number of views that see the centre, but 87% of gap points come from unseen centres.
+  4. `docs/meshflow_public_vs_paper.md` (point count, encoder, vertex control, DiT size differ; training data unstated).
+  5. `docs/eval_protocol.md` section 6: all 297 point scores of 16-19 Nov consistent; six labelled exceptions.
 - **19 Nov block (run 17 Nov evening), `docs/results/2026-11-19_views_focal.md`:**
   - 12 views over three rings (4 at 50, 4 at 20, 4 at -10 deg): set B Chamfer 5.29 (default 5.58, 16 views 5.88),
     recall all @0.02 0.797 (12/12 better), F1@0.01 0.570, outliers > 0.02 17.4%, 40% of the current gap filled.
@@ -85,7 +96,7 @@ Snapshot, rewritten at the end of every work block. Last updated: 2026-11-17 18:
 - Render -> VGGT (8 views) -> TSDF fusion -> camera alignment -> points scored vs GT -> MeshFlow -> protocol v1, all on
   the Mac under the memory rules. Points sources: TSDF (default), filtered (v2), Gaussian centres, Gaussian kernels, TSDF + kernel gap fill.
 - TSDF stage standalone from a saved raw depth file (`scripts/tsdf_points.py`), with timing and peak memory.
-- Queue tooling (`scripts/overnight.sh`; disk and memory thresholds via MIN_DISK_GB / MIN_MEM_PCT). 36 tests pass.
+- Queue tooling (`scripts/overnight.sh`; disk and memory thresholds via MIN_DISK_GB / MIN_MEM_PCT). 42 tests pass.
 
 ## Blocked
 - **ShapeNetCore v2 and Toys4K are gated.** Fahad must request access himself: ShapeNetCore, accept the terms at
@@ -111,11 +122,13 @@ Dense output is the default since 15 Nov (1M points). "Recall all" = share of th
 
 ## Next 3 steps
 1. Fri 20 Nov meeting: methods.pdf, equal count, outliers, seeded 4K, ICP / conf ablation, depth scale, low views,
-   12 views over three rings, focal fit.
+   12 views over three rings, focal fit, and the five follow-ups of 17 Nov.
 2. If agreed: 12 views over three rings as the rig; rerun set A, the gap fill and MeshFlow on it.
 3. Depth bias: only fixable with a depth model that takes the known focal as input (VGGT has none); look for one.
 
 ## Open questions
+- **Kernel allocation: fixed k per Gaussian instead of opacity weighting?** Marginally better (precision +1.5, F1@0.01
+  +0.012, both sets) and simpler. Small change; for Prof. Zhong.
 - **Gap fill: keep, filter or drop?** Better Chamfer and recall, +4 points of outliers; the outliers sit in occluded
   regions no view sees, so filters cannot remove them without removing the gains, and lower confidence thresholds do
   not help (17 Nov). For Prof. Zhong.

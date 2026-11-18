@@ -160,3 +160,29 @@ def sample_kernels(v: np.ndarray, n: int, min_opacity: float = 0.5, max_scale: f
     pts = xyz[pick] + np.einsum("nij,nj->ni", r[pick], s[pick] * z)
     nrm = r[pick, :, :][np.arange(n), :, np.argmin(s[pick], 1)]
     return pts, nrm, pick
+
+
+def sample_kernels_counts(v: np.ndarray, counts: np.ndarray, trunc: float = 2.0, disk: bool = False, seed: int = 0):
+    """Draw counts[i] points from Gaussian i of a 3DGS vertex array (points-per-Gaussian study, 17 Nov).
+
+    Same kernel as sample_kernels (x = mu + R diag(s) z, z ~ N(0, I) truncated to |z_i| <= trunc), but the number of
+    points per Gaussian is given instead of drawn from opacity weights. disk=True sets the z of the smallest axis to 0,
+    so the points lie on the disk spanned by the two largest axes (surface-aligned sampling).
+    Returns (points (n, 3), normals (n, 3) = the source Gaussian's shortest axis, index of the source Gaussian (n,)).
+    """
+    xyz = np.stack([v["x"], v["y"], v["z"]], 1).astype(np.float64)
+    r, s = kernel_frames(v)
+    pick = np.repeat(np.arange(len(counts)), np.asarray(counts, np.int64))
+    n = len(pick)
+    rng = np.random.default_rng(seed)
+    z = rng.standard_normal((n, 3))
+    bad = np.abs(z) > trunc
+    while bad.any():
+        z[bad] = rng.standard_normal(int(bad.sum()))
+        bad = np.abs(z) > trunc
+    short = np.argmin(s[pick], 1)
+    if disk:
+        z[np.arange(n), short] = 0.0
+    pts = xyz[pick] + np.einsum("nij,nj->ni", r[pick], s[pick] * z)
+    nrm = r[pick][np.arange(n), :, short]
+    return pts, nrm, pick
